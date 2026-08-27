@@ -1,14 +1,27 @@
 import React, { useState } from 'react';
 import { 
-  Home, BookOpen, Calendar, Award, Briefcase, Bell 
+  Home, BookOpen, Calendar, Award, Briefcase, Bell, LogOut 
 } from 'lucide-react';
 import AcademicResources from './AcademicResources';
 import MentorshipBooking from './MentorshipBooking';
 import EventTickets from './EventTickets';
 import CareerPortal from './CareerPortal';
-const StudentDashboard = () => {
+
+const StudentDashboard = ({ user, onLogout }) => {
   // বাই-ডিফল্ট 'home' সেকশন একটিভ থাকবে
   const [activeTab, setActiveTab] = useState('home');
+
+  const handleLogout = () => {
+    if (window.confirm("Are you sure you want to log out of CampusConnect?")) {
+      // যদি প্যারেন্ট কম্পোনেন্টে onLogout প্রপস পাস করা থাকে, সেটি কল হবে
+      if (onLogout) {
+        onLogout();
+      } else {
+        // ফলব্যাক হিসেবে সরাসরি লগইন পেজে রিডাইরেক্ট করার জন্য
+        window.location.href = '/login';
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
@@ -24,15 +37,25 @@ const StudentDashboard = () => {
               <Bell className="w-6 h-6" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </button>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
               <div className="w-9 h-9 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-semibold">
-                S
+                {user?.name ? user.name.charAt(0) : 'S'}
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-sm font-medium text-gray-900">MD Istiack</p>
-                <p className="text-xs text-gray-500">CSE • Semester 3.2</p>
+                <p className="text-sm font-medium text-gray-900">{user?.name || "MD Istiack"}</p>
+                <p className="text-xs text-gray-500">{user?.department || "CSE"} • {user?.semester || "Semester 3.2"}</p>
               </div>
             </div>
+
+            {/* Logout Button */}
+            <button 
+              onClick={handleLogout}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors border border-red-100 ml-2"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden md:inline">Logout</span>
+            </button>
           </div>
         </div>
       </header>
@@ -72,7 +95,7 @@ const StudentDashboard = () => {
         {activeTab === 'home' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-lg">
-              <h1 className="text-3xl font-extrabold mb-2">Welcome Back, MD Istiack! 👋</h1>
+              <h1 className="text-3xl font-extrabold mb-2">Welcome Back, {user?.name || "MD Istiack"}! 👋</h1>
               <p className="text-indigo-100 text-sm max-w-2xl">
                 Here is what is happening in your campus today. Explore academic resources, connect with alumni mentors, or register for upcoming campus events!
               </p>
@@ -96,8 +119,8 @@ const StudentDashboard = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <p className="text-xs font-bold text-indigo-600 uppercase">Current Term</p>
-                <h3 className="text-2xl font-black text-gray-900 mt-1">Semester 3.2</h3>
-                <p className="text-xs text-gray-500 mt-2">B.Sc. in CSE • BUP</p>
+                <h3 className="text-2xl font-black text-gray-900 mt-1">{user?.semester || "Semester 3.2"}</h3>
+                <p className="text-xs text-gray-500 mt-2">B.Sc. in {user?.department || "CSE"} • BUP</p>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <p className="text-xs font-bold text-green-600 uppercase">Shared Resources</p>
@@ -119,7 +142,6 @@ const StudentDashboard = () => {
         {/* 3. Mentorship Tab */}
         {activeTab === 'mentorship' && <MentorshipBooking />}
 
-        {/* 4. Events Tab */}
         {/* 4. Events Tab */}
         {activeTab === 'events' && <EventTickets />}
 
