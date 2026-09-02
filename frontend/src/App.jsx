@@ -1,9 +1,10 @@
-import React from 'react';
-import StudentDashboard from './modules/student/StudentDashboard.jsx';
+import React from "react";
+import ClubLeadDashboard from "./modules/club_lead/ClubLeadDashboard.jsx";
+
 function App() {
   return (
     <div>
-      <StudentDashboard />
+      <ClubLeadDashboard />
     </div>
   );
 }
