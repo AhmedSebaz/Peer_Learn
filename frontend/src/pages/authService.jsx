@@ -10,7 +10,6 @@ export const MOCK_USERS = [
 
 // লগইন ভ্যালিডেশন ফাংশন (স্টুডেন্টের জন্য ব্যাকএন্ড API এবং অন্যদের জন্য ডামি ডাটা চেক করবে)
 export const authenticateUser = async (email, password, role) => {
-  // যদি রোল স্টুডেন্ট হয়, তবে ব্যাকএন্ডে রিকোয়েস্ট পাঠাবে
   if (role === "student") {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -19,15 +18,14 @@ export const authenticateUser = async (email, password, role) => {
           "Content-Type": "application/x-www-form-urlencoded",
         },
         body: new URLSearchParams({
-          email : email, // FastAPI OAuth2 সাধারণত username ফিল্ডে email নেয়
+          email: email,     
           password: password,
-          role: role,
+          role: role,       
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        // ব্যাকএন্ড থেকে সফলভাবে লগইন হলে ইউজার অবজেক্ট রিটার্ন করবে
         return {
           email: email,
           role: "student",
@@ -36,7 +34,7 @@ export const authenticateUser = async (email, password, role) => {
           user_id: data.user_id
         };
       } else {
-        return null; // ভুল ইমেইল বা পাসওয়ার্ড হলে
+        return null; 
       }
     } catch (error) {
       console.error("Backend login error:", error);
@@ -44,7 +42,6 @@ export const authenticateUser = async (email, password, role) => {
     }
   } 
   
-  // অন্য রোলগুলোর (Admin, Alumni, Club Lead) জন্য আগের মতো ডামি ডাটা চেক করবে
   else {
     const matchedUser = MOCK_USERS.find(
       (user) => user.email.toLowerCase() === email.toLowerCase() && 
@@ -55,21 +52,12 @@ export const authenticateUser = async (email, password, role) => {
   }
 };
 
-// নতুন ইউজার রেজিস্ট্রেশনের জন্য ফাংশন (ফাইল আপলোডসহ FormData ব্যবহার করা হয়েছে)
-export const registerUser = async (formDataObject) => {
+// নতুন ইউজার রেজিস্ট্রেশনের জন্য ফাংশন (সরাসরি FormData অবজেক্ট ব্যাকএন্ডে পাঠাবে)
+export const registerUser = async (formDataInstance) => {
   try {
-    const formData = new FormData();
-    
-    // ফরমের ডাটাগুলো FormData অবজেক্টে অ্যাপেন্ড করা
-    Object.keys(formDataObject).forEach((key) => {
-      if (formDataObject[key] !== null && formDataObject[key] !== undefined) {
-        formData.append(key, formDataObject[key]);
-      }
-    });
-
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: "POST",
-      body: formData, // যেহেতু আইডি কার্ড বা ফাইল যাচ্ছে, তাই Content-Type হেডার ম্যানুয়ালি JSON দেওয়া যাবে না
+      body: formDataInstance, // সরাসরি FormData পাঠানো হলো, তাই অতিরিক্ত কোনো লুপের প্রয়োজন নেই
     });
 
     if (response.ok) {

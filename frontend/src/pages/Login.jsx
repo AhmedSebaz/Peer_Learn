@@ -126,10 +126,10 @@ export default function Login({ onLoginSuccess, onSwitchToRegister }) {
                 onChange={(e) => setRole(e.target.value)}
                 className="block w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 font-medium text-slate-800"
               >
-                <option value="student">Student Portal</option>
-                <option value="admin">Admin Dashboard</option>
-                <option value="alumni">Alumni Portal</option>
-                <option value="club_lead">Club Leader Portal</option>
+                <option value="student">student</option>
+                <option value="admin">admin</option>
+                <option value="alumni">alumni</option>
+                <option value="club_lead">club_lead</option>
               </select>
             </div>
 

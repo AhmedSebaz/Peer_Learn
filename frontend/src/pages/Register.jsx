@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, Mail, Lock, UserPlus, Briefcase, Award, BookOpen, Link as LinkIcon, FileText, Upload } from 'lucide-react';
+import { registerUser } from './authService';
 
 export default function Register({ onRegister, onSwitchToLogin }) {
   const [formData, setFormData] = useState({
@@ -7,18 +8,19 @@ export default function Register({ onRegister, onSwitchToLogin }) {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'student', // 'student', 'alumni', অথবা 'club_admin'
+    role: 'student', 
     department: 'CSE',
     batch: '',
-    roleTitle: '', // অ্যালুমিনির জন্য কারেন্ট জব টাইটেল
-    clubName: 'BUP Computer Club', // ক্লাব অ্যাডমিনের জন্য ক্লাব নাম
-    semester: '3.2', // স্টুডেন্টের জন্য সেমিস্টার
+    roleTitle: '', 
+    clubName: 'BUP Computer Club', 
+    semester: '3.2', 
     linkedin: '',
     bio: '',
-    idCardFile: null // আইডি কার্ড বা ডকুমেন্ট ফাইলের জন্য
+    idCardFile: null 
   });
 
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -27,7 +29,6 @@ export default function Register({ onRegister, onSwitchToLogin }) {
     });
   };
 
-  // ফাইল হ্যান্ডলার
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setFormData({
@@ -36,8 +37,6 @@ export default function Register({ onRegister, onSwitchToLogin }) {
       });
     }
   };
-
- // নিচের অংশটুকু Register.jsx ফাইলে handleSubmit ফাংশনের ভেতর বসিয়ে দাও
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,37 +57,65 @@ export default function Register({ onRegister, onSwitchToLogin }) {
       return;
     }
 
-    // ব্যাকএন্ডে পাঠানোর জন্য FormData তৈরি করা (যা backend-এর Form(...) এর সাথে ম্যাচ করবে)
-    const dataToSend = {
-      name: formData.name,
-      email: formData.email,
-      password: formData.password,
-      role: formData.role === 'club_admin' ? 'club_lead' : formData.role,
-      department: formData.role === 'student' ? formData.department : 'CSE',
-      batch: formData.role === 'alumni' ? formData.batch : (formData.role === 'student' ? `Semester ${formData.semester}` : 'Admin'),
-      role_title: formData.role === 'alumni' ? formData.roleTitle : (formData.role === 'club_admin' ? `Lead @ ${formData.clubName}` : 'B.Sc. Student'),
-      club_name: formData.role === 'club_admin' ? formData.clubName : '',
-      linkedin: formData.linkedin,
-      bio: formData.bio,
-      id_card: formData.idCardFile // ফাইল অবজেক্ট
-    };
+    if (!formData.idCardFile) {
+      setError('অনুগ্রহ করে আইডি কার্ড বা ডকুমেন্ট ফাইল আপলোড করুন।');
+      return;
+    }
 
-    // authService থেকে registerUser ফাংশন ইম্পোর্ট করে এখানে কল করতে হবে
-    // import { registerUser } from './authService'; (ফাইলের উপরে ইম্পোর্ট করে নিও)
-    
+    setLoading(true);
+
     try {
-      const result = await registerUser(dataToSend);
+      const data = new FormData();
+      data.append('name', formData.name);
+      data.append('email', formData.email);
+      data.append('password', formData.password);
+      
+      const backendRole = formData.role === 'club_admin' ? 'club_lead' : formData.role;
+      data.append('role', backendRole);
+
+      if (backendRole === 'student') {
+        data.append('department', formData.department);
+        data.append('batch', `Semester ${formData.semester}`);
+        data.append('semester', formData.semester);
+      } else if (backendRole === 'alumni') {
+        data.append('role_title', formData.roleTitle);
+        data.append('batch', formData.batch);
+      } else if (backendRole === 'club_lead') {
+        data.append('club_name', formData.clubName);
+        data.append('role_title', `Lead @ ${formData.clubName}`);
+      }
+
+      if (formData.linkedin) {
+        data.append('linkedin', formData.linkedin);
+      }
+      if (formData.bio) {
+        data.append('bio', formData.bio);
+      }
+      
+      if (formData.idCardFile) {
+        data.append('id_card', formData.idCardFile);
+      }
+
+      const result = await registerUser(data);
       
       if (result.success) {
-        alert('রেজিস্ট্রেশন সফল হয়েছে! অ্যাকাউন্টটি এডমিন কর্তৃক অনুমোদিত হওয়ার পর লগইন করতে পারবেন।');
+        alert('রেজিস্ট্রেশন সফল হয়েছে! অ্যাকাউন্টটি এডমিন কর্তৃক অনুমোদিত হওয়ার পর লগইন করতে পারবেন।');
         if (onSwitchToLogin) {
           onSwitchToLogin();
         }
       } else {
-        setError(result.message || 'রেজিস্ট্রেশন সম্পন্ন করা সম্ভব হয়নি।');
+        // এরর মেসেজটি অবজেক্ট বা অ্যারে হলে সেটিকে স্ট্রিং বানিয়ে দেখানো যাতে ক্র্যাশ না করে
+        let msg = result.message;
+        if (typeof msg === 'object') {
+          msg = JSON.stringify(msg);
+        }
+        setError(msg || 'রেজিস্ট্রেশন সম্পন্ন করা সম্ভব হয়নি।');
       }
     } catch (err) {
-      setError('কোথাও কোনো সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      console.error("Registration Exception:", err);
+      setError('সার্ভারে সংযোগ স্থাপন করা যায়নি। ব্যাকএন্ড সার্ভার চালু আছে কি না চেক করুন।');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -111,7 +138,7 @@ export default function Register({ onRegister, onSwitchToLogin }) {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-white py-8 px-6 shadow-xl shadow-slate-100 rounded-3xl border border-slate-100 sm:px-10">
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-100 text-red-600 text-xs p-3 rounded-xl font-medium text-center">
+            <div className="mb-4 bg-red-50 border border-red-100 text-red-600 text-xs p-3 rounded-xl font-medium text-center break-words">
               {error}
             </div>
           )}
@@ -330,7 +357,7 @@ export default function Register({ onRegister, onSwitchToLogin }) {
               <div className="relative flex items-center justify-center px-4 py-3 border-2 border-dashed border-slate-200 rounded-xl hover:border-indigo-500 transition-colors bg-slate-50/50">
                 <div className="flex items-center space-x-2 text-slate-500">
                   <Upload className="h-4 w-4 text-indigo-600" />
-                  <span className="text-xs font-medium">
+                  <span className="text-xs font-medium truncate max-w-[200px]">
                     {formData.idCardFile ? formData.idCardFile.name : 'Upload ID Card (PNG, JPG, PDF)'}
                   </span>
                 </div>
@@ -383,10 +410,11 @@ export default function Register({ onRegister, onSwitchToLogin }) {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full mt-2 flex items-center justify-center space-x-2 bg-indigo-600 text-white font-semibold py-3 rounded-xl text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+              disabled={loading}
+              className="w-full mt-2 flex items-center justify-center space-x-2 bg-indigo-600 text-white font-semibold py-3 rounded-xl text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50"
             >
               <UserPlus className="h-4 w-4" />
-              <span>Create Account</span>
+              <span>{loading ? 'Processing...' : 'Create Account'}</span>
             </button>
           </form>
 

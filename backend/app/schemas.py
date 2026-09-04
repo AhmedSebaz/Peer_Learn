@@ -38,10 +38,12 @@ class UserResponse(UserBase):
 
 # --- Student Profile Schemas ---
 class StudentProfileCreate(BaseModel):
-    student_id: str
+    student_id: Optional[str] = None
     department: str
     batch: str
     semester: str
+    linkedin: Optional[str] = None
+    bio: Optional[str] = None
 
 class StudentProfileResponse(StudentProfileCreate):
     id: int
@@ -51,7 +53,6 @@ class StudentProfileResponse(StudentProfileCreate):
 
     class Config:
         from_attributes = True
-
 
 # --- Alumni Profile Schemas ---
 class AlumniProfileCreate(BaseModel):
@@ -63,6 +64,7 @@ class AlumniProfileCreate(BaseModel):
 class AlumniProfileResponse(AlumniProfileCreate):
     id: int
     user_id: int
+    profile_pic: Optional[str] = None  # <-- অ্যালুনি প্রফাইল পিকচার ফিল্ড যুক্ত করা হলো
     alumni_id_card: Optional[str] = None
 
     class Config:

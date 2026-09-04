@@ -74,7 +74,7 @@ const CareerPortal = ({ user }) => {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
             <Briefcase className="w-6 h-6 text-indigo-600" />
@@ -95,7 +95,7 @@ const CareerPortal = ({ user }) => {
             placeholder="Search title, company, or city..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
           />
         </div>
 
@@ -105,9 +105,9 @@ const CareerPortal = ({ user }) => {
             <button
               key={type}
               onClick={() => setSelectedType(type)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
                 selectedType === type
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-indigo-600 text-white shadow-sm'
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -119,72 +119,78 @@ const CareerPortal = ({ user }) => {
 
       {/* Jobs List */}
       <div className="space-y-4">
-        {filteredJobs.map((job) => {
-          const isApplied = appliedJobs[job.id];
-          return (
-            <div
-              key={job.id}
-              className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:shadow-md transition-shadow"
-            >
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded border border-blue-100">
-                    {job.type}
-                  </span>
-                  <span className="text-xs text-gray-400 flex items-center space-x-1">
-                    <Calendar className="w-3 h-3" />
-                    <span>Deadline: {job.deadline}</span>
-                  </span>
+        {filteredJobs.length > 0 ? (
+          filteredJobs.map((job) => {
+            const isApplied = appliedJobs[job.id];
+            return (
+              <div
+                key={job.id}
+                className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:shadow-md transition-shadow"
+              >
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-lg">
+                      {job.type}
+                    </span>
+                    <span className="text-xs text-gray-400 flex items-center space-x-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>Deadline: {job.deadline}</span>
+                    </span>
+                  </div>
+
+                  <h3 className="font-bold text-gray-900 text-lg">{job.title}</h3>
+
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600">
+                    <span className="flex items-center space-x-1 font-medium">
+                      <Building className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{job.company}</span>
+                    </span>
+                    <span className="flex items-center space-x-1">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{job.location}</span>
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-gray-500 pt-1 line-clamp-2">{job.description}</p>
                 </div>
 
-                <h3 className="font-bold text-gray-900 text-lg">{job.title}</h3>
-
-                <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600">
-                  <span className="flex items-center space-x-1 font-medium">
-                    <Building className="w-3.5 h-3.5 text-gray-400" />
-                    <span>{job.company}</span>
-                  </span>
-                  <span className="flex items-center space-x-1">
-                    <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                    <span>{job.location}</span>
-                  </span>
+                <div className="w-full md:w-auto flex-shrink-0">
+                  <button
+                    disabled={isApplied}
+                    onClick={() => handleOpenApplyModal(job)}
+                    className={`w-full md:w-auto px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center space-x-2 ${
+                      isApplied
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed'
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-100'
+                    }`}
+                  >
+                    {isApplied ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                        <span>Application Sent</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Apply Now</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
                 </div>
-
-                <p className="text-xs text-gray-500 pt-1 line-clamp-2">{job.description}</p>
               </div>
-
-              <div className="w-full md:w-auto flex-shrink-0">
-                <button
-                  disabled={isApplied}
-                  onClick={() => handleOpenApplyModal(job)}
-                  className={`w-full md:w-auto px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-2 ${
-                    isApplied
-                      ? 'bg-green-50 text-green-700 border border-green-200 cursor-not-allowed'
-                      : 'bg-gray-900 hover:bg-black text-white shadow-sm'
-                  }`}
-                >
-                  {isApplied ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                      <span>Application Sent</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Apply Now</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        ) : (
+          <div className="py-12 text-center bg-white rounded-2xl border border-gray-200">
+            <p className="text-sm text-gray-500">কোনো জব অপরচুনিটি পাওয়া যায়নি।</p>
+          </div>
+        )}
       </div>
 
       {/* Job Application Modal */}
       {selectedJobForApply && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative">
             <button 
               onClick={() => setSelectedJobForApply(null)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -210,13 +216,13 @@ const CareerPortal = ({ user }) => {
                   placeholder="Briefly describe why you are a good fit for this role..."
                   value={coverLetter}
                   onChange={(e) => setCoverLetter(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
                 />
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-gray-700 block mb-1">Upload Resume (PDF)</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition-colors cursor-pointer relative">
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:bg-gray-50 transition-colors cursor-pointer relative">
                   <input
                     type="file"
                     accept=".pdf,.doc,.docx"
@@ -224,7 +230,7 @@ const CareerPortal = ({ user }) => {
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
                   <div className="flex flex-col items-center space-y-1">
-                    <Upload className="w-6 h-6 text-gray-400" />
+                    <Upload className="w-6 h-6 text-indigo-600" />
                     <p className="text-xs text-gray-600 font-medium">
                       {resumeFile ? resumeFile.name : "Click to upload resume or drag and drop"}
                     </p>
@@ -236,7 +242,7 @@ const CareerPortal = ({ user }) => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors mt-2 shadow flex items-center justify-center space-x-2"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl text-sm transition-colors mt-2 shadow-lg shadow-indigo-100 flex items-center justify-center space-x-2"
               >
                 {isSubmitting ? (
                   <span>Submitting Application...</span>

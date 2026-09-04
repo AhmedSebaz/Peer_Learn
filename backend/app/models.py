@@ -20,6 +20,7 @@ class NoteType(str, enum.Enum):
     QUESTION = "question"
 
 class NoteStatus(str, enum.Enum):
+    PENDING = "pending"
     ACTIVE = "active"
     DELETED_BY_USER = "deleted_by_user"
     DELETED_BY_ADMIN = "deleted_by_admin"
@@ -63,8 +64,10 @@ class User(Base):
     name = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
-    role = Column(Enum(UserRole), default=UserRole.STUDENT)
-    status = Column(Enum(UserStatus), default=UserStatus.PENDING)
+    
+    role = Column(Enum(UserRole, values_callable=lambda x: [e.value for e in x]), default=UserRole.STUDENT, nullable=False)
+    status = Column(Enum(UserStatus, values_callable=lambda x: [e.value for e in x]), default=UserStatus.PENDING, nullable=False)
+    
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     # Relationships
@@ -95,6 +98,9 @@ class StudentProfile(Base):
     semester = Column(String(20), nullable=False)
     profile_pic = Column(String(255), nullable=True)
     student_id_card = Column(String(255), nullable=True)
+    
+    linkedin = Column(String(255), nullable=True)
+    bio = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="student_profile")
 
@@ -120,6 +126,7 @@ class AlumniProfile(Base):
     current_job_title = Column(String(150), nullable=True)
     company = Column(String(150), nullable=True)
     linkedin_url = Column(String(255), nullable=True)
+    profile_pic = Column(String(255), nullable=True)  # <-- অ্যালুনি প্রফাইল পিকচার কলাম যুক্ত করা হলো
     alumni_id_card = Column(String(255), nullable=True)
 
     user = relationship("User", back_populates="alumni_profile")
@@ -164,7 +171,7 @@ class Note(Base):
     description = Column(Text, nullable=True)
     rating = Column(DECIMAL(3, 2), default=0.00)
     total_ratings = Column(Integer, default=0)
-    status = Column(Enum(NoteStatus), default=NoteStatus.ACTIVE, nullable=False)
+    status = Column(Enum(NoteStatus), default=NoteStatus.PENDING, nullable=False)  # <-- ডিফল্ট পেন্ডিং রাখা হলো
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     user = relationship("User", back_populates="notes")
