@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Mail, Lock, UserPlus, Briefcase, Award, BookOpen, Link as LinkIcon, FileText } from 'lucide-react';
+import { User, Mail, Lock, UserPlus, Briefcase, Award, BookOpen, Link as LinkIcon, FileText, Upload } from 'lucide-react';
 
 export default function Register({ onRegister, onSwitchToLogin }) {
   const [formData, setFormData] = useState({
@@ -14,7 +14,8 @@ export default function Register({ onRegister, onSwitchToLogin }) {
     clubName: 'BUP Computer Club', // ক্লাব অ্যাডমিনের জন্য ক্লাব নাম
     semester: '3.2', // স্টুডেন্টের জন্য সেমিস্টার
     linkedin: '',
-    bio: ''
+    bio: '',
+    idCardFile: null // আইডি কার্ড বা ডকুমেন্ট ফাইলের জন্য
   });
 
   const [error, setError] = useState('');
@@ -24,6 +25,16 @@ export default function Register({ onRegister, onSwitchToLogin }) {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  // ফাইল হ্যান্ডলার
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setFormData({
+        ...formData,
+        idCardFile: e.target.files[0]
+      });
+    }
   };
 
   const handleSubmit = (e) => {
@@ -46,17 +57,19 @@ export default function Register({ onRegister, onSwitchToLogin }) {
       return;
     }
 
-    // রোল অনুযায়ী ইউজারের ডাটা অবজেক্ট তৈরি করা
+    // রোল অনুযায়ী ইউজারের ডাটা অবজেক্ট তৈরি করা (আইডি কার্ড ফাইলের নামসহ)
     const newUser = {
       name: formData.name,
       email: formData.email,
-      role: formData.role === 'club_admin' ? 'club_lead' : formData.role, // অ্যাপের অন্যান্য অংশের সাথে রোল মেইনটেইন করার জন্য
+      role: formData.role === 'club_admin' ? 'club_lead' : formData.role, 
       department: formData.role === 'student' ? formData.department : 'CSE',
       batch: formData.role === 'alumni' ? formData.batch : (formData.role === 'student' ? `Semester ${formData.semester}` : 'Admin'),
       roleTitle: formData.role === 'alumni' ? formData.roleTitle : (formData.role === 'club_admin' ? `Lead @ ${formData.clubName}` : 'B.Sc. Student'),
       clubName: formData.role === 'club_admin' ? formData.clubName : undefined,
       linkedin: formData.linkedin,
-      bio: formData.bio
+      bio: formData.bio,
+      idCardFileName: formData.idCardFile ? formData.idCardFile.name : null,
+      status: 'pending' // এডমিন অ্যাপ্রুভালের জন্য পেন্ডিং স্টেট থাকবে
     };
 
     // যদি প্রপস হিসেবে onRegister ফাংশন পাস করা থাকে
@@ -298,6 +311,29 @@ export default function Register({ onRegister, onSwitchToLogin }) {
                 </div>
               </div>
             )}
+
+            {/* ID Card / Verification Document Upload Field */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                {formData.role === 'alumni' ? 'Alumni Certificate / ID Proof' : 'Student ID Card Image'}
+              </label>
+              <div className="relative flex items-center justify-center px-4 py-3 border-2 border-dashed border-slate-200 rounded-xl hover:border-indigo-500 transition-colors bg-slate-50/50">
+                <div className="flex items-center space-x-2 text-slate-500">
+                  <Upload className="h-4 w-4 text-indigo-600" />
+                  <span className="text-xs font-medium">
+                    {formData.idCardFile ? formData.idCardFile.name : 'Upload ID Card (PNG, JPG, PDF)'}
+                  </span>
+                </div>
+                <input
+                  type="file"
+                  required
+                  accept="image/*,application/pdf"
+                  onChange={handleFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">This will be verified by the admin before account activation.</p>
+            </div>
 
             {/* Extra Professional Details (LinkedIn & Short Bio) */}
             <div>
