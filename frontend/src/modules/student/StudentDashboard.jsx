@@ -13,11 +13,9 @@ const StudentDashboard = ({ user, onLogout }) => {
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to log out of CampusConnect?")) {
-      // যদি প্যারেন্ট কম্পোনেন্টে onLogout প্রপস পাস করা থাকে, সেটি কল হবে
       if (onLogout) {
         onLogout();
       } else {
-        // ফলব্যাক হিসেবে সরাসরি লগইন পেজে রিডাইরেক্ট করার জন্য
         window.location.href = '/login';
       }
     }
@@ -89,7 +87,7 @@ const StudentDashboard = ({ user, onLogout }) => {
           })}
         </div>
 
-        {/* Dynamic Content Rendering */}
+        {/* Dynamic Content Rendering with User Props passed down */}
 
         {/* 1. Welcome / Home Overview */}
         {activeTab === 'home' && (
@@ -123,30 +121,30 @@ const StudentDashboard = ({ user, onLogout }) => {
                 <p className="text-xs text-gray-500 mt-2">B.Sc. in {user?.department || "CSE"} • BUP</p>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <p className="text-xs font-bold text-green-600 uppercase">Shared Resources</p>
-                <h3 className="text-2xl font-black text-gray-900 mt-1">12 Files</h3>
-                <p className="text-xs text-gray-500 mt-2">Downloaded by 45 students</p>
+                <p className="text-xs font-bold text-green-600 uppercase">Account Status</p>
+                <h3 className="text-2xl font-black text-gray-900 mt-1 uppercase">Active</h3>
+                <p className="text-xs text-gray-500 mt-2">Verified Student Account</p>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <p className="text-xs font-bold text-purple-600 uppercase">Upcoming Events</p>
-                <h3 className="text-2xl font-black text-gray-900 mt-1">2 Registered</h3>
-                <p className="text-xs text-gray-500 mt-2">Next: Hackathon 2026</p>
+                <p className="text-xs font-bold text-purple-600 uppercase">Platform Access</p>
+                <h3 className="text-2xl font-black text-gray-900 mt-1">Full Access</h3>
+                <p className="text-xs text-gray-500 mt-2">Connected to FastAPI Backend</p>
               </div>
             </div>
           </div>
         )}
  
-        {/* 2. Academic Resources Tab */}
-        {activeTab === 'resources' && <AcademicResources />}
+        {/* 2. Academic Resources Tab (Passing user object/id if needed) */}
+        {activeTab === 'resources' && <AcademicResources user={user} />}
 
         {/* 3. Mentorship Tab */}
-        {activeTab === 'mentorship' && <MentorshipBooking />}
+        {activeTab === 'mentorship' && <MentorshipBooking user={user} />}
 
         {/* 4. Events Tab */}
-        {activeTab === 'events' && <EventTickets />}
+        {activeTab === 'events' && <EventTickets user={user} />}
 
         {/* 5. Career Tab */}
-        {activeTab === 'career' && <CareerPortal />}
+        {activeTab === 'career' && <CareerPortal user={user} />}
       </main>
     </div>
   );

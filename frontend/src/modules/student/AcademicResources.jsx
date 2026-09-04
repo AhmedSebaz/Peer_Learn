@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Upload, Trash2, Download, Search, FileText } from 'lucide-react';
 import { getAcademicResources, uploadResource, deleteResource } from './studentService';
 
-const AcademicResources = () => {
+const AcademicResources = ({ user }) => {
   const [resources, setResources] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -10,6 +10,7 @@ const AcademicResources = () => {
   const [newTitle, setNewTitle] = useState('');
   const [newCourse, setNewCourse] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     loadResources();
@@ -24,21 +25,40 @@ const AcademicResources = () => {
     e.preventDefault();
     if (!newTitle || !newCourse) return;
 
-    await uploadResource({
+    const userId = user?.id || user?.user_id || 1;
+    setIsUploading(true);
+
+    const response = await uploadResource({
       title: newTitle,
       course: newCourse,
-      fileName: selectedFile ? selectedFile.name : 'Document.pdf'
-    });
+      department: user?.department || 'CSE',
+      noteType: 'NOTES',
+      description: 'Uploaded via CampusConnect Portal',
+      file: selectedFile
+    }, userId);
 
-    setNewTitle('');
-    setNewCourse('');
-    setSelectedFile(null);
-    loadResources();
+    setIsUploading(false);
+
+    if (response && response.success) {
+      setNewTitle('');
+      setNewCourse('');
+      setSelectedFile(null);
+      alert('Resource uploaded successfully!');
+      loadResources();
+    } else {
+      alert(response?.message || 'Failed to upload resource. Please try again.');
+    }
   };
 
   const handleDeleteResource = async (id) => {
-    await deleteResource(id);
-    loadResources();
+    if (window.confirm("Are you sure you want to delete this resource?")) {
+      const success = await deleteResource(id);
+      if (success) {
+        loadResources();
+      } else {
+        alert('Failed to delete resource.');
+      }
+    }
   };
 
   // Search filter
@@ -80,10 +100,11 @@ const AcademicResources = () => {
           />
           <button
             type="submit"
-            className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            disabled={isUploading}
+            className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             <Upload className="w-4 h-4" />
-            <span>Upload Resource</span>
+            <span>{isUploading ? 'Uploading...' : 'Upload Resource'}</span>
           </button>
         </form>
       </div>
@@ -115,7 +136,7 @@ const AcademicResources = () => {
                 <FileText className="w-4 h-4 text-gray-400" />
               </div>
               <h3 className="font-semibold text-gray-900 text-base">{res.title}</h3>
-              <p className="text-xs text-gray-500 mt-1">Uploaded by: {res.uploadedBy || 'Anonymous'}</p>
+              <p className="text-xs text-gray-500 mt-1">Uploaded by: {res.uploadedBy || 'MD Istiack'}</p>
             </div>
 
             <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">

@@ -3,7 +3,7 @@ import { Award, Calendar, MapPin, CheckCircle, Ticket, X, CreditCard, Download }
 import html2pdf from 'html2pdf.js';
 import { getEvents, processEventPayment } from './studentService';
 
-const EventTickets = () => {
+const EventTickets = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [registeredEvents, setRegisteredEvents] = useState({});
@@ -24,6 +24,7 @@ const EventTickets = () => {
 
   // PDF Ticket Generator Function
   const downloadPDFTicket = (evt) => {
+    const userName = user?.name || "MD Istiack";
     const element = document.createElement('div');
     element.innerHTML = `
       <div style="padding: 30px; font-family: Arial, sans-serif; border: 2px dashed #4F46E5; border-radius: 12px; max-width: 500px; margin: auto; background-color: #ffffff;">
@@ -34,7 +35,7 @@ const EventTickets = () => {
         <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 15px 0;" />
         <div>
           <h3 style="margin: 0 0 12px 0; color: #111827; font-size: 18px;">${evt.title}</h3>
-          <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Attendee:</b> MD Istiack</p>
+          <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Attendee:</b> ${userName}</p>
           <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Date:</b> ${evt.date}</p>
           <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Venue:</b> ${evt.location}</p>
           <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Ticket Fee:</b> ${evt.fee === 0 ? 'FREE' : '$' + evt.fee}</p>
@@ -59,10 +60,16 @@ const EventTickets = () => {
 
   // Trigger when clicking Get Ticket
   const handleTicketClick = async (evt) => {
+    const userId = user?.id || user?.user_id || 1;
+
     if (evt.fee === 0) {
-      await processEventPayment(evt.id, 0);
-      setRegisteredEvents((prev) => ({ ...prev, [evt.id]: true }));
-      alert(`Free registration successful for "${evt.title}"! You can now download your ticket.`);
+      const response = await processEventPayment(evt.id, userId, "FREE", { paymentMethod: "FREE" });
+      if (response && response.success) {
+        setRegisteredEvents((prev) => ({ ...prev, [evt.id]: true }));
+        alert(`Free registration successful for "${evt.title}"! You can now download your ticket.`);
+      } else {
+        alert(response?.message || "Registration failed. Please try again.");
+      }
     } else {
       setSelectedEventForPay(evt);
       setAccountNumber('');
@@ -77,12 +84,21 @@ const EventTickets = () => {
       return;
     }
 
-    await processEventPayment(selectedEventForPay.id, selectedEventForPay.fee);
+    const userId = user?.id || user?.user_id || 1;
+    const response = await processEventPayment(
+      selectedEventForPay.id, 
+      userId, 
+      "PAID", 
+      { paymentMethod: paymentMethod.toUpperCase(), transactionId: accountNumber }
+    );
     
-    setRegisteredEvents((prev) => ({ ...prev, [selectedEventForPay.id]: true }));
-    alert(`Payment of $${selectedEventForPay.fee} via ${paymentMethod.toUpperCase()} successful!\nTicket confirmed for "${selectedEventForPay.title}".`);
-    
-    setSelectedEventForPay(null);
+    if (response && response.success) {
+      setRegisteredEvents((prev) => ({ ...prev, [selectedEventForPay.id]: true }));
+      alert(`Payment of $${selectedEventForPay.fee} via ${paymentMethod.toUpperCase()} successful!\nTicket confirmed for "${selectedEventForPay.title}".`);
+      setSelectedEventForPay(null);
+    } else {
+      alert(response?.message || "Payment processing failed. Please try again.");
+    }
   };
 
   const filteredEvents = events.filter((evt) =>

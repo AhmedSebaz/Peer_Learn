@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Calendar, Star, CheckCircle, Clock, UserCheck } from 'lucide-react';
 import { getMentors, bookMentorshipSlot } from './studentService';
 
-const MentorshipBooking = () => {
+const MentorshipBooking = ({ user }) => {
   const [mentors, setMentors] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -18,15 +18,22 @@ const MentorshipBooking = () => {
   };
 
   const handleBookSlot = async (mentorId, mentorName, slot) => {
-    await bookMentorshipSlot(mentorId, slot);
-    
-    // Track booked status locally
-    setBookedSlots((prev) => ({
-      ...prev,
-      [`${mentorId}-${slot}`]: true
-    }));
+    // ইউজার অবজেক্ট থেকে আইডি নেওয়া, না থাকলে ডিফল্ট 1 ব্যবহার করা
+    const userId = user?.id || user?.user_id || 1;
 
-    alert(`Successfully booked a slot with ${mentorName} for ${slot}!`);
+    const response = await bookMentorshipSlot(mentorId, userId, slot);
+    
+    if (response && response.success) {
+      // Track booked status locally
+      setBookedSlots((prev) => ({
+        ...prev,
+        [`${mentorId}-${slot}`]: true
+      }));
+
+      alert(`Successfully booked a slot with ${mentorName} for ${slot}!`);
+    } else {
+      alert(response?.message || "Failed to book slot. Please try again.");
+    }
   };
 
   // Filter mentors based on search term & category

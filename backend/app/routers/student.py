@@ -7,13 +7,13 @@ from datetime import date
 
 from app.database import get_db
 from app.models import (
-    JobType, User, StudentProfile, Note, NoteType, Event, EventRegistration, 
+    JobType, User, UserStatus, StudentProfile, Note, NoteType, Event, EventRegistration, 
     RegistrationType, Payment, PaymentStatus, JobPost, JobApplication
 )
 from app.schemas import (
     JobPostResponse, StudentProfileCreate, StudentProfileResponse, 
     NoteCreate, NoteResponse, 
-    EventResponse,  # এটি যোগ করতে হবে
+    EventResponse,  
     EventRegistrationCreate, EventRegistrationResponse,
     JobApplicationResponse
 )
@@ -28,6 +28,26 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
+# হেল্পার ফাংশন: ইউজার স্ট্যাটাস চেক করার জন্য (Pending বা Banned হলে রিকোয়েস্ট ব্লক করবে)
+def verify_user_status(user_id: int, db: Session):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.status == UserStatus.BANNED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="আপনার অ্যাকাউন্টটি ব্যান করা হয়েছে! আপনি কোনো কার্যক্রম চালাতে পারবেন না।"
+        )
+    
+    if user.status == UserStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="আপনার অ্যাকাউন্টটি এখনো এডমিন কর্তৃক অনুমোদিত (Pending) হয়নি!"
+        )
+    return user
+
+
 # ১. স্টুডেন্ট প্রোফাইল তৈরি বা আপডেট করা (আইডি কার্ড সহ)
 @router.post("/profile", response_model=StudentProfileResponse)
 def create_or_update_student_profile(
@@ -37,13 +57,11 @@ def create_or_update_student_profile(
     semester: str = Form(...),
     profile_pic: Optional[UploadFile] = File(None),
     student_id_card: Optional[UploadFile] = File(None),
-    user_id: int = Form(...), # প্রডাকশনে টোকেন থেকে ইউজার আইডি নেওয়া হবে
+    user_id: int = Form(...), 
     db: Session = Depends(get_db)
 ):
-    # ইউজার স্টুডেন্ট কি না চেক করা
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    # ইউজার স্ট্যাটাস চেক (Pending বা Banned কি না)
+    verify_user_status(user_id, db)
 
     profile_pic_path = None
     id_card_path = None
@@ -105,6 +123,9 @@ def upload_note(
     user_id: int = Form(...),
     db: Session = Depends(get_db)
 ):
+    # ইউজার স্ট্যাটাস চেক
+    verify_user_status(user_id, db)
+
     file_filename = f"note_{user_id}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, file_filename)
     with open(file_path, "wb") as buffer:
@@ -130,9 +151,12 @@ def upload_note(
 @router.post("/events/register", response_model=EventRegistrationResponse)
 def register_for_event(
     registration: EventRegistrationCreate,
-    user_id: int, # প্রডাকশনে টোকেন থেকে আসবে
+    user_id: int, 
     db: Session = Depends(get_db)
 ):
+    # ইউজার স্ট্যাটাস চেক
+    verify_user_status(user_id, db)
+
     event = db.query(Event).filter(Event.id == registration.event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -145,7 +169,7 @@ def register_for_event(
     payment_id = None
     payment_status = PaymentStatus.FREE
 
-    # যদি ইভেন্ট পেইড হয়
+    # যদি ইভেন্ট পেইড হয়
     if registration.registration_type == RegistrationType.PAID:
         if not registration.transaction_id or not registration.payment_method:
             raise HTTPException(status_code=400, detail="Transaction ID and Payment Method are required for paid events")
@@ -180,7 +204,7 @@ def register_for_event(
     return new_registration
 
 
-# ৪. অ্যালুনিদের পোস্ট করা জবে সিভি দিয়ে এপ্লাই করা
+# ৪. অ্যালুনিদের পোস্ট করা জবে সিভি দিয়ে এপ্লাই করা
 @router.post("/jobs/{job_id}/apply", response_model=JobApplicationResponse)
 def apply_for_job(
     job_id: int,
@@ -189,6 +213,9 @@ def apply_for_job(
     resume: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
+    # ইউজার স্ট্যাটাস চেক
+    verify_user_status(user_id, db)
+
     job = db.query(JobPost).filter(JobPost.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job post not found")
@@ -219,7 +246,8 @@ def apply_for_job(
     db.refresh(new_application)
     return new_application
 
-# ৫. সকল নোট বা প্রশ্ন লিস্ট আকারে দেখা (ডিপার্টমেন্ট বা কোর্স কোড দিয়ে ফিল্টার করার সুবিধা সহ)
+
+# ৫. সকল নোট বা প্রশ্ন লিস্ট আকারে দেখা (ডিপার্টমেন্ট বা কোর্স কোড দিয়ে ফিল্টার করার সুবিধা সহ)
 @router.get("/notes", response_model=List[NoteResponse])
 def get_all_notes(
     department: Optional[str] = None,
@@ -229,7 +257,6 @@ def get_all_notes(
 ):
     query = db.query(Note)
     
-    # যদি ফিল্টার করতে চায়
     if department:
         query = query.filter(Note.department.ilike(f"%{department}%"))
     if course_code:
@@ -240,7 +267,8 @@ def get_all_notes(
     notes = query.order_by(Note.created_at.desc()).all()
     return notes
 
-# ৬. সকল জব পোস্ট লিস্ট আকারে দেখা (লোকেশন বা জব টাইপ দিয়ে ফিল্টার করার সুবিধা সহ)
+
+# ৬. সকল জব পোস্ট লিস্ট আকারে দেখা (লোকেশন বা জব টাইপ দিয়ে ফিল্টার করার সুবিধা সহ)
 @router.get("/jobs", response_model=List[JobPostResponse])
 def get_all_jobs(
     location: Optional[str] = None,
@@ -250,7 +278,6 @@ def get_all_jobs(
 ):
     query = db.query(JobPost)
     
-    # ইউজার চাইলে লোকেশন, জব টাইপ বা কোম্পানি দিয়ে ফিল্টার করতে পারবে
     if location:
         query = query.filter(JobPost.location.ilike(f"%{location}%"))
     if job_type:
@@ -261,7 +288,8 @@ def get_all_jobs(
     jobs = query.order_by(JobPost.created_at.desc()).all()
     return jobs
 
-# ৭. আপকামিং ইভেন্টগুলোর তালিকা দেখা (আজ বা ভবিষ্যতের ইভেন্টগুলো স্বয়ংক্রিয়ভাবে দেখাবে)
+
+# ৭. আপকামিং ইভেন্টগুলোর তালিকা দেখা
 @router.get("/events/upcoming", response_model=List[EventResponse])
 def get_upcoming_events(
     club_id: Optional[int] = None,
@@ -269,7 +297,6 @@ def get_upcoming_events(
 ):
     current_date = date.today()
     
-    # আজকের তারিখ বা তার পরের ইভেন্টগুলো ফিল্টার করা
     query = db.query(Event).filter(Event.event_date >= current_date)
     
     if club_id:

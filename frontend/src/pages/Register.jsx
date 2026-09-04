@@ -37,7 +37,9 @@ export default function Register({ onRegister, onSwitchToLogin }) {
     }
   };
 
-  const handleSubmit = (e) => {
+ // নিচের অংশটুকু Register.jsx ফাইলে handleSubmit ফাংশনের ভেতর বসিয়ে দাও
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -46,7 +48,6 @@ export default function Register({ onRegister, onSwitchToLogin }) {
       return;
     }
 
-    // পাসওয়ার্ড ম্যাচ করছে কিনা চেক করা
     if (formData.password !== formData.confirmPassword) {
       setError('পাসওয়ার্ড দুটি মিলছে না! অনুগ্রহ করে আবার চেক করুন।');
       return;
@@ -57,28 +58,37 @@ export default function Register({ onRegister, onSwitchToLogin }) {
       return;
     }
 
-    // রোল অনুযায়ী ইউজারের ডাটা অবজেক্ট তৈরি করা (আইডি কার্ড ফাইলের নামসহ)
-    const newUser = {
+    // ব্যাকএন্ডে পাঠানোর জন্য FormData তৈরি করা (যা backend-এর Form(...) এর সাথে ম্যাচ করবে)
+    const dataToSend = {
       name: formData.name,
       email: formData.email,
-      role: formData.role === 'club_admin' ? 'club_lead' : formData.role, 
+      password: formData.password,
+      role: formData.role === 'club_admin' ? 'club_lead' : formData.role,
       department: formData.role === 'student' ? formData.department : 'CSE',
       batch: formData.role === 'alumni' ? formData.batch : (formData.role === 'student' ? `Semester ${formData.semester}` : 'Admin'),
-      roleTitle: formData.role === 'alumni' ? formData.roleTitle : (formData.role === 'club_admin' ? `Lead @ ${formData.clubName}` : 'B.Sc. Student'),
-      clubName: formData.role === 'club_admin' ? formData.clubName : undefined,
+      role_title: formData.role === 'alumni' ? formData.roleTitle : (formData.role === 'club_admin' ? `Lead @ ${formData.clubName}` : 'B.Sc. Student'),
+      club_name: formData.role === 'club_admin' ? formData.clubName : '',
       linkedin: formData.linkedin,
       bio: formData.bio,
-      idCardFileName: formData.idCardFile ? formData.idCardFile.name : null,
-      status: 'pending' // এডমিন অ্যাপ্রুভালের জন্য পেন্ডিং স্টেট থাকবে
+      id_card: formData.idCardFile // ফাইল অবজেক্ট
     };
 
-    // যদি প্রপস হিসেবে onRegister ফাংশন পাস করা থাকে
-    if (onRegister) {
-      onRegister(newUser);
-    } else {
-      // ফলব্যাক হিসেবে লোকালস্টোরেজে সেভ করে রিফ্রেশ করা
-      localStorage.setItem('campusconnect_user', JSON.stringify(newUser));
-      window.location.reload();
+    // authService থেকে registerUser ফাংশন ইম্পোর্ট করে এখানে কল করতে হবে
+    // import { registerUser } from './authService'; (ফাইলের উপরে ইম্পোর্ট করে নিও)
+    
+    try {
+      const result = await registerUser(dataToSend);
+      
+      if (result.success) {
+        alert('রেজিস্ট্রেশন সফল হয়েছে! অ্যাকাউন্টটি এডমিন কর্তৃক অনুমোদিত হওয়ার পর লগইন করতে পারবেন।');
+        if (onSwitchToLogin) {
+          onSwitchToLogin();
+        }
+      } else {
+        setError(result.message || 'রেজিস্ট্রেশন সম্পন্ন করা সম্ভব হয়নি।');
+      }
+    } catch (err) {
+      setError('কোথাও কোনো সমস্যা হয়েছে। আবার চেষ্টা করুন।');
     }
   };
 

@@ -1,7 +1,18 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import date, datetime
-from app.models import UserRole, NoteType, PaymentStatus, RegistrationType, JobType, ApplicationStatus
+from app.models import (
+    UserRole, 
+    UserStatus, 
+    NoteType, 
+    NoteStatus, 
+    PaymentStatus, 
+    RegistrationType, 
+    JobType, 
+    JobStatus, 
+    ApplicationStatus, 
+    MentorshipStatus
+)
 
 # --- User Schemas ---
 class UserBase(BaseModel):
@@ -18,6 +29,7 @@ class UserLogin(BaseModel):
 
 class UserResponse(UserBase):
     id: int
+    status: UserStatus
     created_at: datetime
 
     class Config:
@@ -41,6 +53,35 @@ class StudentProfileResponse(StudentProfileCreate):
         from_attributes = True
 
 
+# --- Alumni Profile Schemas ---
+class AlumniProfileCreate(BaseModel):
+    passing_year: int
+    current_job_title: Optional[str] = None
+    company: Optional[str] = None
+    linkedin_url: Optional[str] = None
+
+class AlumniProfileResponse(AlumniProfileCreate):
+    id: int
+    user_id: int
+    alumni_id_card: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- Club Schemas ---
+class ClubCreate(BaseModel):
+    club_name: str
+    description: Optional[str] = None
+
+class ClubResponse(ClubCreate):
+    id: int
+    lead_user_id: int
+
+    class Config:
+        from_attributes = True
+
+
 # --- Notes & Questions Schemas ---
 class NoteCreate(BaseModel):
     title: str
@@ -53,6 +94,23 @@ class NoteResponse(NoteCreate):
     id: int
     user_id: int
     file_path: str
+    rating: float
+    total_ratings: int
+    status: NoteStatus
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --- Note Rating Schemas ---
+class NoteRatingCreate(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+
+class NoteRatingResponse(NoteRatingCreate):
+    id: int
+    note_id: int
+    user_id: int
     created_at: datetime
 
     class Config:
@@ -86,6 +144,7 @@ class EventCreate(BaseModel):
 class EventResponse(EventCreate):
     id: int
     club_id: int
+    is_active: bool
     created_at: datetime
 
     class Config:
@@ -104,24 +163,27 @@ class EventRegistrationResponse(BaseModel):
     user_id: int
     registration_type: RegistrationType
     payment_status: PaymentStatus
+    transaction_id: Optional[str] = None
+    payment_method: Optional[str] = None
     registered_at: datetime
 
     class Config:
         from_attributes = True
 
 
-# --- Job Post Schemas (স্টুডেন্টদের জব দেখার জন্য দরকার) ---
+# --- Job Post Schemas ---
 class JobPostCreate(BaseModel):
     job_title: str
     company_name: str
     location: str
     job_type: JobType = JobType.FULL_TIME
     description: str
-    application_link: Optional[str] = None
+    application_link: str
 
 class JobPostResponse(JobPostCreate):
     id: int
-    alumni_id: int # রাউটারের সাথে মিলিয়ে ফিল্ড নাম ঠিক রাখা হয়েছে
+    alumni_user_id: int
+    status: JobStatus
     created_at: datetime
 
     class Config:
@@ -137,8 +199,24 @@ class JobApplicationResponse(JobApplicationCreate):
     job_id: int
     user_id: int
     resume_path: str
-    status: Optional[ApplicationStatus] = ApplicationStatus.PENDING
+    status: ApplicationStatus
     applied_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --- Alumni Mentorship Request Schemas ---
+class MentorshipRequestCreate(BaseModel):
+    alumni_id: int
+    preferred_date: date
+    message: Optional[str] = None
+
+class MentorshipRequestResponse(MentorshipRequestCreate):
+    id: int
+    student_id: int
+    status: MentorshipStatus
+    created_at: datetime
 
     class Config:
         from_attributes = True

@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, MapPin, Building, Calendar, Search, CheckCircle, ExternalLink } from 'lucide-react';
-import { getCareerJobs } from './studentService';
+import { Briefcase, MapPin, Building, Calendar, Search, CheckCircle, ExternalLink, X, FileText, Upload } from 'lucide-react';
+import { getCareerJobs, applyForJob } from './studentService';
 
-const CareerPortal = () => {
+const CareerPortal = ({ user }) => {
   const [jobs, setJobs] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('All');
   const [appliedJobs, setAppliedJobs] = useState({});
+
+  // Application Modal States
+  const [selectedJobForApply, setSelectedJobForApply] = useState(null);
+  const [coverLetter, setCoverLetter] = useState('');
+  const [resumeFile, setResumeFile] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadJobs();
@@ -17,12 +23,40 @@ const CareerPortal = () => {
     setJobs(data || []);
   };
 
-  const handleApply = (jobId, jobTitle, company) => {
-    setAppliedJobs((prev) => ({
-      ...prev,
-      [jobId]: true
-    }));
-    alert(`Successfully applied for "${jobTitle}" at ${company}!`);
+  // Trigger when clicking Apply Now
+  const handleOpenApplyModal = (job) => {
+    setSelectedJobForApply(job);
+    setCoverLetter('');
+    setResumeFile(null);
+  };
+
+  // Submit application form to Backend
+  const handleConfirmApplication = async (e) => {
+    e.preventDefault();
+    if (!selectedJobForApply) return;
+
+    const userId = user?.id || user?.user_id || 1;
+    setIsSubmitting(true);
+
+    const response = await applyForJob(
+      selectedJobForApply.id,
+      userId,
+      coverLetter,
+      resumeFile
+    );
+
+    setIsSubmitting(false);
+
+    if (response && response.success) {
+      setAppliedJobs((prev) => ({
+        ...prev,
+        [selectedJobForApply.id]: true
+      }));
+      alert(`Successfully applied for "${selectedJobForApply.title}" at ${selectedJobForApply.company}!`);
+      setSelectedJobForApply(null);
+    } else {
+      alert(response?.message || "Job application failed. Please try again.");
+    }
   };
 
   const filteredJobs = jobs.filter((job) => {
@@ -122,7 +156,7 @@ const CareerPortal = () => {
               <div className="w-full md:w-auto flex-shrink-0">
                 <button
                   disabled={isApplied}
-                  onClick={() => handleApply(job.id, job.title, job.company)}
+                  onClick={() => handleOpenApplyModal(job)}
                   className={`w-full md:w-auto px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-2 ${
                     isApplied
                       ? 'bg-green-50 text-green-700 border border-green-200 cursor-not-allowed'
@@ -146,6 +180,74 @@ const CareerPortal = () => {
           );
         })}
       </div>
+
+      {/* Job Application Modal */}
+      {selectedJobForApply && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+            <button 
+              onClick={() => setSelectedJobForApply(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-2 text-indigo-600 font-bold mb-1">
+              <FileText className="w-5 h-5" />
+              <span>Job Application</span>
+            </div>
+            
+            <h3 className="text-lg font-bold text-gray-900">{selectedJobForApply.title}</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Company: <span className="text-gray-800 font-semibold">{selectedJobForApply.company}</span>
+            </p>
+
+            <form onSubmit={handleConfirmApplication} className="mt-5 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Cover Letter / Note to Recruiter</label>
+                <textarea
+                  rows="4"
+                  placeholder="Briefly describe why you are a good fit for this role..."
+                  value={coverLetter}
+                  onChange={(e) => setCoverLetter(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Upload Resume (PDF)</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition-colors cursor-pointer relative">
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => setResumeFile(e.target.files[0])}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                  <div className="flex flex-col items-center space-y-1">
+                    <Upload className="w-6 h-6 text-gray-400" />
+                    <p className="text-xs text-gray-600 font-medium">
+                      {resumeFile ? resumeFile.name : "Click to upload resume or drag and drop"}
+                    </p>
+                    <p className="text-[10px] text-gray-400">PDF, DOC up to 5MB</p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors mt-2 shadow flex items-center justify-center space-x-2"
+              >
+                {isSubmitting ? (
+                  <span>Submitting Application...</span>
+                ) : (
+                  <span>Submit Application</span>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
