@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Upload, Trash2, Download, Search, FileText, Filter, Star } from 'lucide-react';
+import { BookOpen, Upload, Trash2, Download, Search, FileText, Filter, Star, Eye } from 'lucide-react';
 import { getAcademicResources, uploadResource, deleteResource } from './studentService';
 
 const AcademicResources = ({ user }) => {
@@ -61,6 +61,43 @@ const AcademicResources = ({ user }) => {
     }
   };
 
+  // ফাইল নতুন ট্যাবে ভিউ করার ফাংশন
+  const handleViewFile = (filePath) => {
+    if (!filePath) {
+      alert("ফাইল পাথ পাওয়া যায়নি!");
+      return;
+    }
+    window.open(filePath, '_blank');
+  };
+
+  // ফাইল সরাসরি ডাউনলোড করার ফাংশন
+  const handleDownloadFile = async (filePath, title) => {
+    if (!filePath) {
+      alert("ডাউনলোড করার মতো কোনো ফাইল নেই!");
+      return;
+    }
+
+    try {
+      const response = await fetch(filePath);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      
+      const extension = filePath.split('.').pop() || 'pdf';
+      link.download = `${title || 'resource'}.${extension}`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Download failed:", error);
+      window.open(filePath, '_blank');
+    }
+  };
+
   // ডিলিট পপআপ ওপেন করা
   const openDeleteModal = (id) => {
     setResourceToDelete(id);
@@ -91,11 +128,10 @@ const AcademicResources = ({ user }) => {
     if (selectedTab === 'MY_RESOURCES') {
       return matchesSearch && (res.user_id === currentUserId || res.userId === currentUserId);
     } else if (selectedTab === 'NOTES') {
-      return matchesSearch && res.note_type === 'NOTES' && res.status !== 'pending';
+      return matchesSearch && res.noteType === 'NOTES' && res.status !== 'pending';
     } else if (selectedTab === 'QUESTION') {
-      return matchesSearch && (res.note_type === 'QUESTION' || res.note_type === 'QUESTIONS') && res.status !== 'pending';
+      return matchesSearch && (res.noteType === 'QUESTION' || res.noteType === 'QUESTIONS') && res.status !== 'pending';
     } else {
-      // ALL active resources (hide pending ones for regular users unless it's their own in MY_RESOURCES)
       return matchesSearch && res.status !== 'pending';
     }
   });
@@ -191,7 +227,7 @@ const AcademicResources = ({ user }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredResources.length > 0 ? (
           filteredResources.map((res) => {
-            const isMyResource = res.user_id === currentUserId || res.userId === currentUserId;
+            const isMyResource = res.userId === currentUserId;
             const isPending = res.status === 'pending';
 
             return (
@@ -200,16 +236,16 @@ const AcademicResources = ({ user }) => {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
                       <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-lg">
-                        {res.course_code || res.course}
+                        {res.course}
                       </span>
                       <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${
                         isPending 
                           ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
-                          : res.note_type === 'QUESTION' || res.note_type === 'QUESTIONS' 
+                          : res.noteType === 'QUESTION' || res.noteType === 'QUESTIONS' 
                           ? 'bg-amber-50 text-amber-700 border border-amber-200' 
                           : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       }`}>
-                        {isPending ? '⏳ Pending Approval' : (res.note_type === 'QUESTION' || res.note_type === 'QUESTIONS' ? 'QUESTION' : 'NOTES')}
+                        {isPending ? '⏳ Pending Approval' : (res.noteType === 'QUESTION' || res.noteType === 'QUESTIONS' ? 'QUESTION' : 'NOTES')}
                       </span>
                     </div>
                     
@@ -224,11 +260,24 @@ const AcademicResources = ({ user }) => {
                   <p className="text-xs text-gray-500 mt-1">Uploaded by: {isMyResource ? 'You' : (res.uploadedBy || 'MD Istiack')}</p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-                  <span className="flex items-center space-x-1">
-                    <Download className="w-3.5 h-3.5" />
-                    <span>{res.downloads || 0} downloads</span>
-                  </span>
+                {/* File Action Buttons (View & Download) */}
+                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleViewFile(res.filePath)}
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-semibold transition flex items-center gap-1"
+                      title="View PDF / File"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> View
+                    </button>
+                    <button
+                      onClick={() => handleDownloadFile(res.filePath, res.title)}
+                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs font-semibold transition flex items-center gap-1"
+                      title="Download File"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download
+                    </button>
+                  </div>
                   
                   {/* Delete button (Only for own resource or admin) */}
                   {(isMyResource || user?.role === 'admin') && (

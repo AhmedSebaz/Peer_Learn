@@ -31,7 +31,8 @@ export const authenticateUser = async (email, password, role) => {
           role: "student",
           name: data.name || "Student",
           access_token: data.access_token,
-          user_id: data.user_id
+          user_id: data.user_id,
+          profile_pic: data.profile_pic || null // <-- প্রফাইল পিকচার যুক্ত করা হলো
         };
       } else {
         return null; 
@@ -57,7 +58,7 @@ export const registerUser = async (formDataInstance) => {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: "POST",
-      body: formDataInstance, // সরাসরি FormData পাঠানো হলো, তাই অতিরিক্ত কোনো লুপের প্রয়োজন নেই
+      body: formDataInstance, // সরাসরি FormData পাঠানো হলো, তাই অতিরিক্ত কোনো লুপের প্রয়োজন নেই
     });
 
     if (response.ok) {
