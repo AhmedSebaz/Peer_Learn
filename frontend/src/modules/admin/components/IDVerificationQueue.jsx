@@ -1,43 +1,36 @@
-import React, { useState } from 'react';
-import { UserCheck, CheckCircle2, XCircle, FileText, ExternalLink, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UserCheck, CheckCircle2, XCircle, FileText, ExternalLink, Search, RefreshCw } from 'lucide-react';
+import { fetchVerificationQueue, handleVerificationAction } from '../adminService';
 
 const IDVerificationQueue = () => {
+  const [requests, setRequests] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Mock Pending Verification Requests Data
-  const [requests, setRequests] = useState([
-    {
-      id: 'v1',
-      name: 'Tanvir Hossain',
-      email: 'tanvir.cse@univ.edu',
-      role: 'Student',
-      department: 'CSE',
-      studentId: '2021-1-60-045',
-      submittedDate: 'Aug 28, 2026',
-      documentUrl: '#',
-      idCardImage: 'https://via.placeholder.com/300x180?text=Student+ID+Card'
-    },
-    {
-      id: 'v2',
-      name: 'Nusrat Jahan',
-      email: 'nusrat.alumni@gmail.com',
-      role: 'Alumni',
-      department: 'EEE',
-      graduationYear: '2023',
-      submittedDate: 'Aug 27, 2026',
-      documentUrl: '#',
-      idCardImage: 'https://via.placeholder.com/300x180?text=Certificate/ID+Copy'
-    }
-  ]);
 
-  const handleApprove = (id, name) => {
-    alert(`Successfully verified identity for ${name}!`);
-    setRequests(requests.filter(req => req.id !== id));
+  useEffect(() => {
+    loadVerificationQueue();
+  }, []);
+
+  const loadVerificationQueue = async () => {
+    setIsLoading(true);
+    const data = await fetchVerificationQueue();
+    setRequests(data || []);
+    setIsLoading(false);
   };
 
-  const handleReject = (id, name) => {
-    if (window.confirm(`Are you sure you want to reject verification for ${name}?`)) {
-      setRequests(requests.filter(req => req.id !== id));
+  // এক্সেপ্ট বা রিজেক্ট হ্যান্ডলার
+  const onActionClick = async (id, name, action) => {
+    const confirmMsg = action === 'accept' 
+      ? `Are you sure you want to approve identity for ${name}?`
+      : `Are you sure you want to reject verification for ${name}?`;
+
+    if (window.confirm(confirmMsg)) {
+      const success = await handleVerificationAction(id, action);
+      if (success) {
+        loadVerificationQueue(); // সফল হলে লিস্ট রিফ্রেশ করবে
+      } else {
+        alert('অ্যাকশনটি সম্পন্ন করা যায়নি। পুনরায় চেষ্টা করুন।');
+      }
     }
   };
 
@@ -59,6 +52,14 @@ const IDVerificationQueue = () => {
         </div>
 
         <div className="flex items-center space-x-3">
+          <button
+            onClick={loadVerificationQueue}
+            className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-500 transition-colors"
+            title="Refresh Queue"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+
           <div className="relative">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
             <input
@@ -76,7 +77,9 @@ const IDVerificationQueue = () => {
       </div>
 
       {/* Verification List */}
-      {filteredRequests.length === 0 ? (
+      {isLoading ? (
+        <div className="text-center py-12 text-gray-400 text-xs">Loading verification queue...</div>
+      ) : filteredRequests.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <UserCheck className="w-12 h-12 mx-auto mb-2 opacity-40" />
           <p className="font-semibold text-gray-600">No pending verification requests!</p>
@@ -116,15 +119,15 @@ const IDVerificationQueue = () => {
                   </div>
                   <div>
                     <span className="text-gray-400 block text-[10px] font-semibold uppercase">
-                      {req.role === 'Student' ? 'Student ID' : 'Graduation Year'}
+                      {req.role === 'Student' ? 'Student ID' : 'Details'}
                     </span>
                     <span className="font-semibold text-gray-800">
-                      {req.role === 'Student' ? req.studentId : req.graduationYear}
+                      {req.studentId}
                     </span>
                   </div>
                 </div>
 
-                {/* Document Preview Placeholder */}
+                {/* Document Preview */}
                 <div className="border border-dashed border-gray-300 rounded-lg p-3 text-center bg-white">
                   <FileText className="w-6 h-6 text-gray-400 mx-auto mb-1" />
                   <p className="text-xs font-semibold text-gray-700">Submitted ID Document / Card</p>
@@ -143,14 +146,14 @@ const IDVerificationQueue = () => {
               {/* Action Buttons */}
               <div className="flex items-center space-x-3 pt-2 border-t border-gray-100">
                 <button
-                  onClick={() => handleReject(req.id, req.name)}
+                  onClick={() => onActionClick(req.id, req.name, 'reject')}
                   className="flex-1 flex items-center justify-center space-x-1.5 border border-red-200 text-red-600 hover:bg-red-50 py-2 rounded-lg text-xs font-semibold transition-colors"
                 >
                   <XCircle className="w-4 h-4" />
                   <span>Reject</span>
                 </button>
                 <button
-                  onClick={() => handleApprove(req.id, req.name)}
+                  onClick={() => onActionClick(req.id, req.name, 'accept')}
                   className="flex-1 flex items-center justify-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors"
                 >
                   <CheckCircle2 className="w-4 h-4" />

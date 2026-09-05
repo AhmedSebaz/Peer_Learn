@@ -1,14 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Home, UserCheck, ShieldAlert, Users, Briefcase, Bell, LogOut 
+  Home, UserCheck, ShieldAlert, Users, Briefcase, Bell, LogOut, RefreshCw 
 } from 'lucide-react';
 import IDVerificationQueue from './components/IDVerificationQueue';
 import ContentModeration from './components/ContentModeration';
 import UserManagement from './components/UserManagement';
 import JobApprovalQueue from './components/JobApprovalQueue';
+import { fetchAdminDashboardStats } from './adminService'; // সার্ভিস থেকে স্ট্যাটস ফেচ করার ফাংশন
 
 const AdminDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('home');
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    studentsCount: 0,
+    alumniCount: 0,
+    pendingVerifications: 0,
+    flaggedReports: 0,
+    activeEvents: 5,
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  // ড্যাশবোর্ড লোড হওয়ার সময় ব্যাকএন্ড থেকে ডাইনামিক স্ট্যাটস ফেচ করা
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    setIsLoadingStats(true);
+    const data = await fetchAdminDashboardStats();
+    if (data) {
+      setStats(data);
+    }
+    setIsLoadingStats(false);
+  };
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to log out of Admin Portal?")) {
@@ -30,16 +54,19 @@ const AdminDashboard = ({ user, onLogout }) => {
             <h1 className="text-xl font-bold text-gray-900">CampusConnect Admin Portal</h1>
           </div>
           <div className="flex items-center space-x-4">
-            <button className="p-2 text-gray-500 hover:text-gray-700 relative">
-              <Bell className="w-6 h-6" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            <button 
+              onClick={loadStats} 
+              className="p-2 text-gray-500 hover:text-indigo-600 transition-colors"
+              title="Refresh Dashboard Stats"
+            >
+              <RefreshCw className={`w-5 h-5 ${isLoadingStats ? 'animate-spin' : ''}`} />
             </button>
             <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
               <div className="w-9 h-9 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-semibold">
                 {user?.name ? user.name.charAt(0) : 'A'}
               </div>
               <div className="hidden sm:block text-left">
-               <p className="text-sm font-medium text-gray-900">Sabbir (Admin)</p>
+               <p className="text-sm font-medium text-gray-900">{user?.name || "System Admin"}</p>
                 <p className="text-xs text-gray-500">{user?.role || "Super Admin"} • Central Office</p>
               </div>
             </div>
@@ -89,7 +116,7 @@ const AdminDashboard = ({ user, onLogout }) => {
         {activeTab === 'home' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-lg">
-              <h1 className="text-3xl font-extrabold mb-2">Welcome Back, Sabbir Hossain (Admin)! 🛡️</h1>
+              <h1 className="text-3xl font-extrabold mb-2">Welcome Back, {user?.name || "Admin"}! 🛡️</h1>
               <p className="text-indigo-100 text-sm max-w-2xl">
                 System status is normal. Review pending student & alumni ID verifications, moderate flagged community resources, or manage portal permissions.
               </p>
@@ -98,38 +125,46 @@ const AdminDashboard = ({ user, onLogout }) => {
                   onClick={() => setActiveTab('verification')}
                   className="bg-white text-indigo-600 font-semibold px-5 py-2.5 rounded-lg text-sm hover:bg-opacity-90 transition-all shadow"
                 >
-                  Verify IDs (8 Pending)
+                  Verify IDs ({stats.pendingVerifications} Pending)
                 </button>
                 <button 
                   onClick={() => setActiveTab('moderation')}
                   className="bg-indigo-700 text-white font-semibold px-5 py-2.5 rounded-lg text-sm hover:bg-indigo-800 transition-all border border-indigo-500"
                 >
-                  Review Flagged Content
+                  Review Content Moderation
                 </button>
               </div>
             </div>
 
-            {/* Quick Stats Grid */}
+            {/* Quick Stats Grid (Dynamic Values) */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <p className="text-xs font-bold text-indigo-600 uppercase">Total Users</p>
-                <h3 className="text-2xl font-black text-gray-900 mt-1">1,420</h3>
-                <p className="text-xs text-gray-500 mt-2">1,100 Students • 320 Alumni</p>
+                <h3 className="text-2xl font-black text-gray-900 mt-1">
+                  {isLoadingStats ? '...' : stats.totalUsers}
+                </h3>
+                <p className="text-xs text-gray-500 mt-2">{stats.studentsCount} Students • {stats.alumniCount} Alumni</p>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <p className="text-xs font-bold text-amber-600 uppercase">Pending Verifications</p>
-                <h3 className="text-2xl font-black text-gray-900 mt-1">8 Requests</h3>
+                <h3 className="text-2xl font-black text-gray-900 mt-1">
+                  {isLoadingStats ? '...' : `${stats.pendingVerifications} Requests`}
+                </h3>
                 <p className="text-xs text-gray-500 mt-2">Requires document check</p>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <p className="text-xs font-bold text-red-600 uppercase">Flagged Reports</p>
-                <h3 className="text-2xl font-black text-gray-900 mt-1">3 Items</h3>
+                <p className="text-xs font-bold text-red-600 uppercase">Flagged / Pending Content</p>
+                <h3 className="text-2xl font-black text-gray-900 mt-1">
+                  {isLoadingStats ? '...' : `${stats.flaggedReports} Items`}
+                </h3>
                 <p className="text-xs text-gray-500 mt-2">Needs moderation action</p>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <p className="text-xs font-bold text-green-600 uppercase">Active Events</p>
-                <h3 className="text-2xl font-black text-gray-900 mt-1">5 Live</h3>
-                <p className="text-xs text-gray-500 mt-2">Total 450 tickets sold</p>
+                <h3 className="text-2xl font-black text-gray-900 mt-1">
+                  {isLoadingStats ? '...' : `${stats.activeEvents} Live`}
+                </h3>
+                <p className="text-xs text-gray-500 mt-2">University wide portal</p>
               </div>
             </div>
           </div>
