@@ -39,3 +39,6 @@ MANIFEST
 .idea/
 *.swp
 *.swo
+
+# Uploaded Files / Media
+uploads/
