@@ -1,202 +1,291 @@
-// Mock Data Storage for Academic Resources
-let mockResources = [
-  {
-    id: 1,
-    title: 'Data Structures & Algorithms Handwritten Notes',
-    course: 'CSE-2101',
-    uploadedBy: 'MD Istiack',
-    downloads: 142,
-    fileName: 'DSA_Notes_2026.pdf'
-  },
-  {
-    id: 2,
-    title: 'Object Oriented Programming JavaFX Cheat Sheet',
-    course: 'CSE-2203',
-    uploadedBy: 'Aziz',
-    downloads: 89,
-    fileName: 'JavaFX_Guide.pdf'
-  },
-  {
-    id: 3,
-    title: 'Database Management Systems SQL Query Bank',
-    course: 'CSE-3101',
-    uploadedBy: 'Rahat Hasan',
-    downloads: 215,
-    fileName: 'DBMS_SQL_Practice.pdf'
-  },
-  {
-    id: 4,
-    title: 'Operating System Short Notes & Architecture Diagram',
-    course: 'CSE-3201',
-    uploadedBy: 'MD Istiack',
-    downloads: 64,
-    fileName: 'OS_Summary.pdf'
-  },
-  {
-    id: 5,
-    title: 'Algorithm Design Analysis Mid-Term Question Solution',
-    course: 'CSE-3203',
-    uploadedBy: 'Sabbir Ahmed',
-    downloads: 178,
-    fileName: 'Algorithm_Sol_2026.pdf'
-  }
-];
+// ব্যাকএন্ড API বেজ URL
+const API_BASE_URL = "http://127.0.0.1:8000";
 
-// Mock Data Storage for Mentors
-let mockMentors = [
-  {
-    id: 1,
-    name: 'Tanvir Ahmed',
-    role: 'Software Engineer',
-    company: 'Google',
-    rating: 4.9,
-    bio: 'Ex-BUPian (Dept. of CSE). Specializes in System Design, Backend Architecture, and Codeforces Problem Solving.',
-    slots: ['10:00 AM', '02:30 PM', '06:00 PM']
-  },
-  {
-    id: 2,
-    name: 'Nadia Chowdhury',
-    role: 'UI/UX Designer',
-    company: 'Grab',
-    rating: 4.8,
-    bio: 'Product Designer focusing on Design Systems, User Research, and Micro-interactions. Happy to review portfolios!',
-    slots: ['11:00 AM', '04:00 PM']
-  },
-  {
-    id: 3,
-    name: 'Arafat Rahman',
-    role: 'Data Scientist',
-    company: 'Brain Station 23',
-    rating: 4.9,
-    bio: 'Passionate about Machine Learning, NLP, and Data Pipelines. Guidance on ML thesis and career roadmap.',
-    slots: ['03:00 PM', '07:30 PM', '09:00 PM']
-  },
-  {
-    id: 4,
-    name: 'Sabrina Islam',
-    role: 'Full Stack Developer',
-    company: 'Therap BD',
-    rating: 4.7,
-    bio: 'Working with React, Node.js, and Cloud Infrastructure. Can guide on Web Projects and Technical Interview Prep.',
-    slots: ['05:00 PM', '08:00 PM']
-  }
-];
+// --- USER PROFILE & PICTURE UPLOAD ---
+export const updateProfile = async (userId, profileData, profilePicFile) => {
+  try {
+    const formData = new FormData();
+    formData.append("name", profileData.name || "");
+    formData.append("department", profileData.department || "CSE");
+    formData.append("batch", profileData.batch || "");
+    formData.append("bio", profileData.bio || "");
+    formData.append("linkedin", profileData.linkedin || "");
+    
+    if (profilePicFile) {
+      formData.append("profile_pic", profilePicFile);
+    }
 
-// --- ACADEMIC RESOURCES SERVICES ---
-export const getAcademicResources = async () => {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve([...mockResources]), 300);
-  });
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/profile`, {
+      method: "PUT",
+      body: formData,
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return { success: true, data };
+    } else {
+      const err = await response.json();
+      return { success: false, message: err.detail || "Profile update failed" };
+    }
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    return { success: false, message: "Server connection error" };
+  }
 };
 
-export const uploadResource = async (newRes) => {
-  return new Promise((resolve) => {
-    const resource = {
-      id: Date.now(),
-      title: newRes.title,
-      course: newRes.course,
-      uploadedBy: 'MD Istiack',
-      downloads: 0,
-      fileName: newRes.fileName || 'Document.pdf'
-    };
-    mockResources.unshift(resource);
-    setTimeout(() => resolve(resource), 300);
-  });
+
+// --- ACADEMIC RESOURCES & NOTES SERVICES ---
+
+export const getAcademicResources = async (department = '', courseCode = '') => {
+  try {
+    let url = `${API_BASE_URL}/student/notes`;
+    const params = new URLSearchParams();
+    if (department) params.append("department", department);
+    if (courseCode) params.append("course_code", courseCode);
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+
+    const response = await fetch(url);
+    if (response.ok) {
+      const data = await response.json();
+      return data.map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        title: item.title,
+        course: item.course_code,
+        department: item.department,
+        noteType: item.note_type,
+        status: item.status || 'pending',
+        rating: item.rating || 0.00,
+        totalRatings: item.total_ratings || 0,
+        uploadedBy: item.user_id ? `User #${item.user_id}` : 'Unknown',
+        downloads: item.downloads || 0,
+        fileName: item.file_path ? item.file_path.split('/').pop() : 'Document.pdf',
+        // পূর্ণাঙ্গ ফাইল পাথ বা ইউআরএল সেট করা হলো যাতে ভিউ বা ডাউনলোড করা যায়
+        filePath: item.file_path ? (item.file_path.startsWith('http') ? item.file_path : `${API_BASE_URL}/${item.file_path}`) : null,
+        description: item.description
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching academic resources:", error);
+    return [];
+  }
+};
+
+export const uploadResource = async (newRes, userId) => {
+  try {
+    const formData = new FormData();
+    formData.append("title", newRes.title);
+    formData.append("department", newRes.department || "CSE");
+    formData.append("course_code", newRes.course || "");
+    formData.append("note_type", newRes.noteType || "NOTES");
+    formData.append("description", newRes.description || "");
+    formData.append("user_id", userId);
+    
+    if (newRes.file) {
+      formData.append("file", newRes.file);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/student/notes/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      return { success: true, data: result };
+    } else {
+      const errData = await response.json();
+      return { success: false, message: errData.detail || "Upload failed" };
+    }
+  } catch (error) {
+    console.error("Error uploading resource:", error);
+    return { success: false, message: "Server connection error" };
+  }
 };
 
 export const deleteResource = async (id) => {
-  return new Promise((resolve) => {
-    mockResources = mockResources.filter((res) => res.id !== id);
-    setTimeout(() => resolve(true), 300);
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/student/notes/${id}`, {
+      method: "DELETE",
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("Error deleting resource:", error);
+    return false;
+  }
 };
+
+export const rateResource = async (noteId, userId, rating) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/student/notes/${noteId}/rate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, rating: rating })
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("Error rating resource:", error);
+    return false;
+  }
+};
+
 
 // --- MENTORSHIP SERVICES ---
+
 export const getMentors = async () => {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve([...mockMentors]), 300);
-  });
-};
-
-export const bookMentorshipSlot = async (mentorId, slot) => {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve({ success: true, mentorId, slot }), 300);
-  });
-};
-
-// Mock Events Data
-let mockEvents = [
-  {
-    id: 1,
-    title: 'Inter-University Hackathon 2026',
-    description: '36-hour coding battle focused on AI and Smart Campus solutions. Food and swags provided!',
-    date: '15 Sep 2026',
-    location: 'BUP Auditorium',
-    fee: 0
-  },
-  {
-    id: 2,
-    title: 'System Design & Microservices Workshop',
-    description: 'Hands-on training session on scaling web apps, Docker, and Kubernetes by industry leads.',
-    date: '28 Sep 2026',
-    location: 'Lab-402, Dept. of CSE',
-    fee: 10
-  },
-  {
-    id: 3,
-    title: 'IEEE Tech Seminar: Quantum Computing Basics',
-    description: 'An introductory session on quantum algorithms and future possibilities in computing.',
-    date: '05 Oct 2026',
-    location: 'Central Multipurpose Hall',
-    fee: 0
+  try {
+    const response = await fetch(`${API_BASE_URL}/student/mentors`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.map(mentor => ({
+        id: mentor.id,
+        name: mentor.name,
+        role: mentor.role_title || mentor.role,
+        company: mentor.company,
+        rating: mentor.rating || 5.0,
+        bio: mentor.bio,
+        slots: mentor.slots || []
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching mentors:", error);
+    return [];
   }
-];
+};
 
-// Events Services
+export const bookMentorshipSlot = async (mentorId, userId, slot) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/student/mentors/book`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        mentor_id: mentorId,
+        user_id: userId,
+        slot_time: slot
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      return { success: true, data: result };
+    } else {
+      const errData = await response.json();
+      return { success: false, message: errData.detail || "Booking failed" };
+    }
+  } catch (error) {
+    console.error("Error booking slot:", error);
+    return { success: false, message: "Server connection error" };
+  }
+};
+
+
+// --- EVENTS SERVICES ---
+
 export const getEvents = async () => {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve([...mockEvents]), 300);
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/student/events/upcoming`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.map(event => ({
+        id: event.id,
+        title: event.title,
+        description: event.description,
+        date: event.event_date,
+        location: event.location,
+        seatLimit: event.seat_limit || 50,
+        fee: event.registration_fee || 0
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching upcoming events:", error);
+    return [];
+  }
 };
 
-export const processEventPayment = async (eventId, fee) => {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve({ success: true, eventId, fee }), 300);
-  });
-};
-// Mock Career Jobs Data
-let mockJobs = [
-  {
-    id: 1,
-    title: 'Software Engineer Intern (React / Node)',
-    company: 'Brain Station 23',
-    location: 'Dhaka, Bangladesh (Hybrid)',
-    type: 'Internship',
-    deadline: '10 Sep 2026',
-    description: 'Looking for 3rd/4th year CSE undergrads with strong fundamentals in JavaScript, React, and REST APIs.'
-  },
-  {
-    id: 2,
-    title: 'Junior QA Automation Engineer',
-    company: 'Therap BD',
-    location: 'Dhaka, Bangladesh',
-    type: 'Full-time',
-    deadline: '20 Sep 2026',
-    description: 'Fresh graduates welcome! Basic understanding of Selenium, Java/Python, and SQL required.'
-  },
-  {
-    id: 3,
-    title: 'UI/UX Design Trainee',
-    company: 'Pathao',
-    location: 'Remote',
-    type: 'Part-time',
-    deadline: '05 Oct 2026',
-    description: 'Work alongside lead designers to create wireframes and UI components in Figma.'
+export const processEventPayment = async (eventId, userId, registrationType = "FREE", paymentDetails = {}) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/student/events/register?user_id=${userId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        event_id: eventId,
+        registration_type: registrationType,
+        transaction_id: paymentDetails.transactionId || null,
+        payment_method: paymentDetails.paymentMethod || null
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      return { success: true, data: result };
+    } else {
+      const errData = await response.json();
+      return { success: false, message: errData.detail || "Event registration failed" };
+    }
+  } catch (error) {
+    console.error("Error registering event:", error);
+    return { success: false, message: "Server connection error" };
   }
-];
+};
+
+
+// --- CAREER JOBS SERVICES ---
 
 export const getCareerJobs = async () => {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve([...mockJobs]), 300);
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/student/jobs`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.map(job => ({
+        id: job.id,
+        title: job.title,
+        company: job.company_name,
+        location: job.location,
+        type: job.job_type,
+        deadline: job.deadline || 'N/A',
+        description: job.description
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching jobs:", error);
+    return [];
+  }
+};
+
+export const applyForJob = async (jobId, userId, coverLetter, resumeFile) => {
+  try {
+    const formData = new FormData();
+    formData.append("user_id", userId);
+    formData.append("cover_letter", coverLetter || "");
+    if (resumeFile) {
+      formData.append("resume", resumeFile);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/student/jobs/${jobId}/apply`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      return { success: true, data: result };
+    } else {
+      const errData = await response.json();
+      return { success: false, message: errData.detail || "Job application failed" };
+    }
+  } catch (error) {
+    console.error("Error applying for job:", error);
+    return { success: false, message: "Server connection error" };
+  }
 };
