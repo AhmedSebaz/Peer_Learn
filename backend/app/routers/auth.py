@@ -52,12 +52,25 @@ def login_user(
             detail="আপনার অ্যাকাউন্টটি এখনো এডমিন কর্তৃক অনুমোদিত (Pending) হয়নি!"
         )
 
-    # প্রফাইল পিকচার পাথ ফেচ করা
+    # প্রফাইল ও অতিরিক্ত তথ্য ফেচ করা
     profile_pic = None
+    department = None
+    batch = None
+    semester = None
+    bio = None
+    linkedin = None
+
     if user_role_str.lower() == "student" and user.student_profile:
         profile_pic = user.student_profile.profile_pic
+        department = user.student_profile.department
+        batch = user.student_profile.batch
+        semester = user.student_profile.semester
+        bio = user.student_profile.bio
+        linkedin = user.student_profile.linkedin
     elif user_role_str.lower() == "alumni" and user.alumni_profile:
         profile_pic = user.alumni_profile.profile_pic
+        linkedin = user.alumni_profile.linkedin_url
+        bio = user.alumni_profile.current_job_title
 
     return {
         "message": "সফলভাবে লগইন হয়েছে!",
@@ -65,7 +78,12 @@ def login_user(
         "name": user.name,
         "email": user.email,
         "role": user_role_str,
-        "profile_pic": profile_pic
+        "profile_pic": profile_pic,
+        "department": department,
+        "batch": batch,
+        "semester": semester,
+        "bio": bio,
+        "linkedin": linkedin
     }
 
 
@@ -155,7 +173,7 @@ def register_user(
     }
 
 
-# ৩. ইউজার প্রফাইল ও পিকচার আপডেট এন্ডপয়েন্ট (ফ্রন্টএন্ডের সাথে কানেক্টেড)
+# ۳. ইউজার প্রফাইল ও পিকচার আপডেট এন্ডপয়েন্ট (ফ্রন্টএন্ডের সাথে কানেক্টেড)
 @router.put("/users/{user_id}/profile")
 def update_user_profile(
     user_id: int,
