@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Calendar, Star, CheckCircle, Clock, UserCheck } from 'lucide-react';
+import { Search, Calendar, Star, CheckCircle, Clock, UserCheck, AlertCircle } from 'lucide-react';
 import { getMentors, bookMentorshipSlot } from './studentService';
 
-const MentorshipBooking = () => {
+const MentorshipBooking = ({ user }) => {
   const [mentors, setMentors] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [bookedSlots, setBookedSlots] = useState({});
+  // ট্র্যাক করার জন্য স্টেট: { 'mentorId-slotTime': 'pending' | 'accepted' }
+  const [slotStatuses, setSlotStatuses] = useState({});
 
   useEffect(() => {
     loadMentors();
@@ -18,15 +19,21 @@ const MentorshipBooking = () => {
   };
 
   const handleBookSlot = async (mentorId, mentorName, slot) => {
-    await bookMentorshipSlot(mentorId, slot);
-    
-    // Track booked status locally
-    setBookedSlots((prev) => ({
-      ...prev,
-      [`${mentorId}-${slot}`]: true
-    }));
+    const userId = user?.id || user?.user_id || 1;
 
-    alert(`Successfully booked a slot with ${mentorName} for ${slot}!`);
+    const response = await bookMentorshipSlot(mentorId, userId, slot);
+    
+    if (response && response.success) {
+      // রিকোয়েস্ট পাঠানোর সাথে সাথে স্ট্যাটাস 'pending' হয়ে যাবে
+      setSlotStatuses((prev) => ({
+        ...prev,
+        [`${mentorId}-${slot}`]: 'pending'
+      }));
+
+      alert(`Successfully sent mentorship request to ${mentorName} for ${slot}!`);
+    } else {
+      alert(response?.message || "Failed to book slot. Please try again.");
+    }
   };
 
   // Filter mentors based on search term & category
@@ -46,7 +53,7 @@ const MentorshipBooking = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
             <UserCheck className="w-6 h-6 text-indigo-600" />
@@ -67,7 +74,7 @@ const MentorshipBooking = () => {
             placeholder="Search by mentor name, company, or role..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
           />
         </div>
 
@@ -77,9 +84,9 @@ const MentorshipBooking = () => {
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
                 selectedCategory === cat
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-indigo-600 text-white shadow-sm'
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -92,7 +99,7 @@ const MentorshipBooking = () => {
       {/* Mentors Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredMentors.map((mentor) => (
-          <div key={mentor.id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div key={mentor.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
             <div>
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-4">
@@ -105,7 +112,7 @@ const MentorshipBooking = () => {
                     <p className="text-xs text-indigo-600 font-semibold">{mentor.company}</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-1 bg-amber-50 px-2.5 py-1 rounded-md text-amber-700 border border-amber-200">
+                <div className="flex items-center space-x-1 bg-amber-50 px-2.5 py-1 rounded-lg text-amber-700 border border-amber-200">
                   <Star className="w-3.5 h-3.5 fill-current" />
                   <span className="text-xs font-bold">{mentor.rating || '4.9'}</span>
                 </div>
@@ -121,32 +128,40 @@ const MentorshipBooking = () => {
             <div className="mt-6 pt-4 border-t border-gray-100">
               <p className="text-xs font-bold text-gray-700 flex items-center space-x-1 mb-3">
                 <Clock className="w-3.5 h-3.5 text-gray-400" />
-                <span>Available Slots Today</span>
+                <span>Available Slots</span>
               </p>
 
               <div className="flex flex-wrap gap-2">
                 {mentor.slots && mentor.slots.length > 0 ? (
                   mentor.slots.map((slot, idx) => {
-                    const isBooked = bookedSlots[`${mentor.id}-${slot}`];
+                    const status = slotStatuses[`${mentor.id}-${slot}`]; // 'pending', 'accepted' অথবা undefined
+                    
                     return (
                       <button
                         key={idx}
-                        disabled={isBooked}
+                        disabled={status === 'pending' || status === 'accepted'}
                         onClick={() => handleBookSlot(mentor.id, mentor.name, slot)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1 transition-all ${
-                          isBooked
-                            ? 'bg-green-100 text-green-700 border border-green-200 cursor-not-allowed'
+                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+                          status === 'pending'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200 cursor-wait'
+                            : status === 'accepted'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
                             : 'bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 border border-indigo-100'
                         }`}
                       >
-                        {isBooked ? (
+                        {status === 'pending' ? (
                           <>
-                            <CheckCircle className="w-3 h-3" />
-                            <span>Booked</span>
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                            <span>Pending...</span>
+                          </>
+                        ) : status === 'accepted' ? (
+                          <>
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Accepted</span>
                           </>
                         ) : (
                           <>
-                            <Calendar className="w-3 h-3" />
+                            <Calendar className="w-3.5 h-3.5" />
                             <span>{slot}</span>
                           </>
                         )}
