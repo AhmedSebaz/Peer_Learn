@@ -81,6 +81,7 @@ class ClubCreate(BaseModel):
 class ClubResponse(ClubCreate):
     id: int
     lead_user_id: int
+    approval_document: Optional[str] = None  # নতুন অ্যাট্রিবিউট যুক্ত করা হলো
 
     class Config:
         from_attributes = True
@@ -153,6 +154,7 @@ class EventResponse(EventCreate):
     id: int
     club_id: int
     banner_url: Optional[str] = None          # ইভেন্ট ব্যানার ইমেজ পাথ/ইউআরএল
+    approval_copy: Optional[str] = None       # নতুন অ্যাট্রিবিউট যুক্ত করা হলো
     status: EventStatus                       # ড্রাফট বা পাবলিশ স্ট্যাটাস
     is_active: bool
     created_at: datetime

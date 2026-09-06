@@ -9,11 +9,13 @@ import {
   LogOut, 
   Edit3, 
   Check, 
-  X 
+  X,
+  FileText
 } from 'lucide-react';
 import SlotManager from './SlotManager';
 import MentorshipRequests from './MentorshipRequests';
 import PostJobModal from './PostJobModal';
+import ViewApplications from './ViewApplications'; // নতুন امپورট
 
 export default function AlumniDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -21,7 +23,7 @@ export default function AlumniDashboard({ user, onLogout }) {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
-  // Dynamic Profile State (লগইন করা ইউজারের ডাটা বা ফলব্যাক ডাটা দিয়ে ইনিশিয়ালাইজ করা হলো)
+  // Dynamic Profile State
   const [userProfile, setUserProfile] = useState({
     name: user?.name || "Alex Morgan",
     role: user?.role || "Senior Software Engineer",
@@ -62,10 +64,12 @@ export default function AlumniDashboard({ user, onLogout }) {
     }
   };
 
+  // নেভিগেশন আইটেমগুলোতে 'applications' ট্যাব যুক্ত করা হলো
   const navItems = [
     { id: 'overview', label: 'Home Overview', icon: Home },
     { id: 'slots', label: 'Slot Manager', icon: Calendar },
     { id: 'requests', label: 'Mentorship Requests', icon: Users },
+    { id: 'applications', label: 'View Applications', icon: FileText },
   ];
 
   return (
@@ -205,6 +209,7 @@ export default function AlumniDashboard({ user, onLogout }) {
         )}
         {activeTab === 'slots' && <SlotManager />}
         {activeTab === 'requests' && <MentorshipRequests />}
+        {activeTab === 'applications' && <ViewApplications />}
       </main>
 
       {/* Job Post Modal */}

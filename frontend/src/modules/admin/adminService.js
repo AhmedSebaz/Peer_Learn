@@ -29,16 +29,25 @@ export const fetchVerificationQueue = async () => {
     const response = await fetch(`${API_BASE_URL}/admin/verifications/pending`);
     if (response.ok) {
       const data = await response.json();
-      return data.map(user => ({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role || 'Student',
-        department: user.department || 'CSE',
-        studentId: user.student_id || user.id,
-        submittedDate: user.submitted_date || 'Recent',
-        documentUrl: user.document_path ? (user.document_path.startsWith('http') ? user.document_path : `${API_BASE_URL}/${user.document_path}`) : '#'
-      }));
+      return data.map(user => {
+        // ক্লাব লিড বা অন্যান্য রোলের ডকুমেন্ট পাথ হ্যান্ডেল করার জন্য সেফটি চেক
+        let cleanPath = user.document_path || user.approval_document || user.student_id_card || user.alumni_id_card || '';
+        
+        if (cleanPath.startsWith('/')) {
+          cleanPath = cleanPath.slice(1);
+        }
+        
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role || 'Student',
+          department: user.department || 'CSE',
+          studentId: user.student_id || user.id,
+          submittedDate: user.submitted_date || 'Recent',
+          documentUrl: cleanPath ? (cleanPath.startsWith('http') ? cleanPath : `${API_BASE_URL}/${cleanPath}`) : ''
+        };
+      });
     }
     return [];
   } catch (error) {
@@ -68,16 +77,22 @@ export const fetchFlaggedContent = async () => {
     const response = await fetch(`${API_BASE_URL}/admin/notes/moderation`);
     if (response.ok) {
       const data = await response.json();
-      return data.map(item => ({
-        id: item.id,
-        title: item.title,
-        type: item.note_type || 'Academic Note',
-        status: item.status || 'pending', // 'pending', 'active', 'rejected'
-        uploadedBy: item.uploader_name || `User #${item.user_id}`,
-        reason: item.reason || 'Pending Review',
-        date: item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Recent',
-        fileUrl: item.file_path ? (item.file_path.startsWith('http') ? item.file_path : `${API_BASE_URL}/${item.file_path}`) : '#'
-      }));
+      return data.map(item => {
+        let cleanPath = item.file_path || '';
+        if (cleanPath.startsWith('/')) {
+          cleanPath = cleanPath.slice(1);
+        }
+        return {
+          id: item.id,
+          title: item.title,
+          type: item.note_type || 'Academic Note',
+          status: item.status || 'pending', // 'pending', 'active', 'rejected'
+          uploadedBy: item.uploader_name || `User #${item.user_id}`,
+          reason: item.reason || 'Pending Review',
+          date: item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Recent',
+          fileUrl: cleanPath ? (cleanPath.startsWith('http') ? cleanPath : `${API_BASE_URL}/${cleanPath}`) : ''
+        };
+      });
     }
     return [];
   } catch (error) {

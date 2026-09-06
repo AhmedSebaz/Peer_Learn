@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from app.database import get_db
-from app.models import User, StudentProfile, AlumniProfile, Note, JobPost, UserStatus, UserRole
+from app.models import User, StudentProfile, AlumniProfile, Club, Note, JobPost, UserStatus, UserRole
 
 router = APIRouter(
     prefix="/admin",
@@ -27,7 +27,7 @@ def get_admin_stats(db: Session = Depends(get_db)):
     alumni_count = db.query(User).filter(User.role == UserRole.ALUMNI).count()
     pending_verifications = db.query(User).filter(User.status == UserStatus.PENDING).count()
     
-    # পেন্ডিং বা ফ্ল্যাগড নোটস/কোয়েশ্চেন গণনা
+    # পেন্ডিং বা ফ্ল্যাগড নোটস/কোয়েশ্চেন গণনা
     flagged_reports = db.query(Note).filter(Note.status == "pending").count()
 
     return {
@@ -60,6 +60,10 @@ def get_pending_verifications(db: Session = Depends(get_db)):
         elif role_str.lower() == "alumni" and u.alumni_profile:
             doc_path = u.alumni_profile.alumni_id_card
             dept = "Alumni"
+        elif role_str.lower() in ["club_lead", "club_admin"] and u.clubs:
+            # ক্লাব লিডের ক্ষেত্রে ক্লাবের approval_document থেকে পাথ নিয়ে আসা
+            doc_path = u.clubs[0].approval_document if u.clubs else None
+            dept = "Club Lead"
 
         result.append({
             "id": u.id,
@@ -79,7 +83,7 @@ def get_pending_verifications(db: Session = Depends(get_db)):
 def process_verification(user_id: int, payload: VerificationActionRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="ইউজার পাওয়া যায়নি!")
+        raise HTTPException(status_code=404, detail="ইউজার পাওয়া যায়নি!")
 
     action = payload.action.lower()
     if action == "accept":
@@ -90,7 +94,7 @@ def process_verification(user_id: int, payload: VerificationActionRequest, db: S
         raise HTTPException(status_code=400, detail="অমূল্য (Invalid) অ্যাকশন!")
 
     db.commit()
-    return {"message": f"ইউজার সফলভাবে {action} করা হয়েছে!"}
+    return {"message": f"ইউজার সফলভাবে {action} করা হয়েছে!"}
 
 
 # ৪. কনটেন্ট মডারেশন (Notes & Questions - Pending, Active, Rejected সব দেখার জন্য)
@@ -122,11 +126,11 @@ def get_notes_moderation(db: Session = Depends(get_db)):
 def update_note_status(note_id: int, payload: StatusUpdateRequest, db: Session = Depends(get_db)):
     note = db.query(Note).filter(Note.id == note_id).first()
     if not note:
-        raise HTTPException(status_code=404, detail="নোট বা রিসোর্সটি পাওয়া যায়নি!")
+        raise HTTPException(status_code=404, detail="নোট বা রিসোর্সটি পাওয়া যায়নি!")
 
     note.status = payload.status.lower() # 'active', 'rejected', 'pending'
     db.commit()
-    return {"message": "নোটের স্ট্যাটাস সফলভাবে আপডেট করা হয়েছে!"}
+    return {"message": "নোটের স্ট্যাটাস সফলভাবে আপডেট করা হয়েছে!"}
 
 
 # ৬. ইউজার ম্যানেজমেন্ট (সব ইউজারের লিস্ট)
@@ -162,7 +166,7 @@ def get_all_users(db: Session = Depends(get_db)):
 def update_user_status(user_id: int, payload: StatusUpdateRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="ইউজার পাওয়া যায়নি!")
+        raise HTTPException(status_code=404, detail="ইউজার পাওয়া যায়নি!")
 
     if payload.status.lower() == "active":
         user.status = UserStatus.ACTIVE
@@ -170,13 +174,12 @@ def update_user_status(user_id: int, payload: StatusUpdateRequest, db: Session =
         user.status = UserStatus.BANNED
 
     db.commit()
-    return {"message": "ইউজারের স্ট্যাটাস সফলভাবে পরিবর্তন করা হয়েছে!"}
+    return {"message": "ইউজারের স্ট্যাটাস সফলভাবে পরিবর্তন করা হয়েছে!"}
 
 
 # ৮. এলামনাই জব পোস্ট মডারেশন (Pending/Approved/Rejected Jobs)
 @router.get("/jobs/moderation")
 def get_jobs_moderation(db: Session = Depends(get_db)):
-    # যদি JobPost মডেল প্রজেক্টে থেকে থাকে
     try:
         jobs = db.query(JobPost).all()
     except Exception:
@@ -184,12 +187,12 @@ def get_jobs_moderation(db: Session = Depends(get_db)):
 
     result = []
     for j in jobs:
-        poster = db.query(User).filter(User.id == j.user_id).first() if hasattr(j, "user_id") else None
+        poster = db.query(User).filter(User.id == j.alumni_user_id).first() if hasattr(j, "alumni_user_id") else None
         poster_name = poster.name if poster else "Alumni"
 
         result.append({
             "id": j.id,
-            "title": j.title,
+            "title": j.job_title,
             "company_name": j.company_name,
             "location": j.location,
             "job_type": j.job_type,
@@ -207,10 +210,10 @@ def update_job_status(job_id: int, payload: StatusUpdateRequest, db: Session = D
     try:
         job = db.query(JobPost).filter(JobPost.id == job_id).first()
         if not job:
-            raise HTTPException(status_code=404, detail="জব পোস্টটি পাওয়া যায়নি!")
+            raise HTTPException(status_code=404, detail="জব পোস্টটি পাওয়া যায়নি!")
 
         job.status = payload.status.lower() # 'active', 'rejected', 'pending'
         db.commit()
-        return {"message": "জব পোস্টের স্ট্যাটাস সফলভাবে আপডেট করা হয়েছে!"}
+        return {"message": "জব পোস্টের স্ট্যাটাস সফলভাবে আপডেট করা হয়েছে!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

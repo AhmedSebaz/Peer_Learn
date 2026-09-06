@@ -111,13 +111,15 @@ def register_user(
             detail="এই ইমেইল দিয়ে ইতোমধ্যে একটি অ্যাকাউন্ট রয়েছে!"
         )
 
-    # আইডি কার্ড বা ডকুমেন্ট ফাইল সেভ করা
-    id_card_path = None
+    # আইডি কার্ড বা ডকুমেন্ট ফাইল সেভ করা (সঠিক পাথ কনভার্শনসহ)
+    id_card_db_path = None
     if id_card:
         filename = f"verify_{email.split('@')[0]}_{id_card.filename}"
-        id_card_path = os.path.join(UPLOAD_DIR, filename)
-        with open(id_card_path, "wb") as buffer:
+        full_file_path = os.path.join(UPLOAD_DIR, filename)
+        with open(full_file_path, "wb") as buffer:
             shutil.copyfileobj(id_card.file, buffer)
+        # ব্যাকএন্ড থেকে সহজে এক্সেস করার জন্য ফরোয়ার্ড স্ল্যাশ ফরম্যাট
+        id_card_db_path = f"{UPLOAD_DIR}/{filename}"
 
     # ১. মূল users টেবিলে ইউজার তৈরি করা
     new_user = User(
@@ -142,7 +144,7 @@ def register_user(
             semester="3.2",
             linkedin=linkedin,
             bio=bio,
-            student_id_card=id_card_path
+            student_id_card=id_card_db_path
         )
         db.add(student_profile)
 
@@ -153,7 +155,7 @@ def register_user(
             current_job_title=role_title,
             company="Not Specified",
             linkedin_url=linkedin,
-            alumni_id_card=id_card_path
+            alumni_id_card=id_card_db_path
         )
         db.add(alumni_profile)
 
@@ -161,7 +163,8 @@ def register_user(
         new_club = Club(
             club_name=club_name or "BUP Computer Club",
             lead_user_id=new_user.id,
-            description=bio
+            description=bio,
+            approval_document=id_card_db_path  # ক্লাব লিডের ক্ষেত্রে এখানে আইডি কার্ড/ডকুমেন্ট পাথ যুক্ত করা হলো
         )
         db.add(new_club)
 
@@ -173,7 +176,7 @@ def register_user(
     }
 
 
-# ۳. ইউজার প্রফাইল ও পিকচার আপডেট এন্ডপয়েন্ট (ফ্রন্টএন্ডের সাথে কানেক্টেড)
+# ৩. ইউজার প্রফাইল ও পিকচার আপডেট এন্ডপয়েন্ট (ফ্রন্টএন্ডের সাথে কানেক্টেড)
 @router.put("/users/{user_id}/profile")
 def update_user_profile(
     user_id: int,
@@ -196,12 +199,13 @@ def update_user_profile(
     user_role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
 
     # প্রফাইল ছবি আপলোড হলে সেটি সেভ করা
-    profile_pic_path = None
+    profile_pic_db_path = None
     if profile_pic:
         filename = f"profile_{user.id}_{profile_pic.filename}"
-        profile_pic_path = os.path.join(UPLOAD_DIR, filename)
-        with open(profile_pic_path, "wb") as buffer:
+        full_file_path = os.path.join(UPLOAD_DIR, filename)
+        with open(full_file_path, "wb") as buffer:
             shutil.copyfileobj(profile_pic.file, buffer)
+        profile_pic_db_path = f"{UPLOAD_DIR}/{filename}"
 
     # স্টুডেন্ট প্রফাইল আপডেট
     if user_role_str.lower() == "student":
@@ -211,7 +215,7 @@ def update_user_profile(
             if batch: profile.batch = batch
             if linkedin: profile.linkedin = linkedin
             if bio: profile.bio = bio
-            if profile_pic_path: profile.profile_pic = profile_pic_path
+            if profile_pic_db_path: profile.profile_pic = profile_pic_db_path
         else:
             profile = StudentProfile(
                 user_id=user.id,
@@ -221,7 +225,7 @@ def update_user_profile(
                 semester="3.2",
                 linkedin=linkedin,
                 bio=bio,
-                profile_pic=profile_pic_path
+                profile_pic=profile_pic_db_path
             )
             db.add(profile)
 
@@ -231,21 +235,21 @@ def update_user_profile(
         if profile:
             if role_title: profile.current_job_title = role_title
             if linkedin: profile.linkedin_url = linkedin
-            if profile_pic_path: profile.profile_pic = profile_pic_path
+            if profile_pic_db_path: profile.profile_pic = profile_pic_db_path
         else:
             profile = AlumniProfile(
                 user_id=user.id,
                 passing_year=2023,
                 current_job_title=role_title,
                 linkedin_url=linkedin,
-                profile_pic=profile_pic_path
+                profile_pic=profile_pic_db_path
             )
             db.add(profile)
 
     db.commit()
     db.refresh(user)
 
-    final_pic = profile_pic_path
+    final_pic = profile_pic_db_path
     if not final_pic:
         if user_role_str.lower() == "student" and user.student_profile:
             final_pic = user.student_profile.profile_pic

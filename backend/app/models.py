@@ -127,6 +127,7 @@ class Club(Base):
     club_name = Column(String(100), nullable=False)
     lead_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     description = Column(Text, nullable=True)
+    approval_document = Column(String(255), nullable=True)  # নতুন অ্যাট্রিবিউট যুক্ত করা হলো
 
     lead_user = relationship("User", back_populates="clubs")
     events = relationship("Event", back_populates="club", cascade="all, delete")
@@ -224,6 +225,7 @@ class Event(Base):
     registration_fee = Column(DECIMAL(10, 2), default=0.00)
     description = Column(Text, nullable=True)
     banner_url = Column(String(255), nullable=True)
+    approval_copy = Column(String(255), nullable=True)  # নতুন অ্যাট্রিবিউট যুক্ত করা হলো
     status = Column(Enum(EventStatus, values_callable=lambda x: [e.value for e in x]), default=EventStatus.DRAFT, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
@@ -291,7 +293,7 @@ class JobApplication(Base):
 class AlumniMentorshipRequest(Base):
     __tablename__ = "alumni_mentorship_requests"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # ব্যাকটিক্স সরিয়ে ঠিক করা হয়েছে
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     alumni_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     preferred_date = Column(Date, nullable=False)

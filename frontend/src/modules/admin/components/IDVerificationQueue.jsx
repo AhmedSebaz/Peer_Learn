@@ -18,7 +18,6 @@ const IDVerificationQueue = () => {
     setIsLoading(false);
   };
 
-  // এক্সেপ্ট বা রিজেক্ট হ্যান্ডলার
   const onActionClick = async (id, name, action) => {
     const confirmMsg = action === 'accept' 
       ? `Are you sure you want to approve identity for ${name}?`
@@ -27,9 +26,9 @@ const IDVerificationQueue = () => {
     if (window.confirm(confirmMsg)) {
       const success = await handleVerificationAction(id, action);
       if (success) {
-        loadVerificationQueue(); // সফল হলে লিস্ট রিফ্রেশ করবে
+        loadVerificationQueue();
       } else {
-        alert('অ্যাকশনটি সম্পন্ন করা যায়নি। পুনরায় চেষ্টা করুন।');
+        alert('অ্যাকশনটি সম্পন্ন করা যায়নি। পুনরায় চেষ্টা করুন।');
       }
     }
   };
@@ -132,9 +131,9 @@ const IDVerificationQueue = () => {
                   <FileText className="w-6 h-6 text-gray-400 mx-auto mb-1" />
                   <p className="text-xs font-semibold text-gray-700">Submitted ID Document / Card</p>
                   <a 
-                    href={req.documentUrl} 
+                    href={req.documentUrl?.startsWith('http') ? req.documentUrl : `http://127.0.0.1:8000/${req.documentUrl}`} 
                     target="_blank" 
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center space-x-1 text-[11px] text-indigo-600 hover:underline font-medium mt-1"
                   >
                     <span>View full resolution document</span>
