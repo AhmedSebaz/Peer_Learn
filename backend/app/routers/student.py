@@ -130,7 +130,6 @@ def upload_note(
 
     final_course_code = course_code or course or "CSE-3201"
     
-    # নোট টাইপ নিশ্চিত করা যাতে বড় হাতের বা সঠিক ফরম্যাটে সেভ হয়
     clean_note_type = (note_type or "NOTES").upper()
     if clean_note_type not in ["NOTES", "QUESTION", "QUESTIONS"]:
         clean_note_type = "NOTES"
@@ -183,7 +182,6 @@ def rate_note(
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
 
-    # ইউজার ইতিমধ্যে রেট করেছে কিনা চেক করা
     existing_rating = db.query(NoteRating).filter(
         NoteRating.note_id == note_id,
         NoteRating.user_id == user_id
@@ -201,7 +199,6 @@ def rate_note(
 
     db.commit()
 
-    # এভারেজ রেটিং এবং মোট রেটিং সংখ্যা আপডেট করা
     all_ratings = db.query(NoteRating).filter(NoteRating.note_id == note_id).all()
     total_count = len(all_ratings)
     avg_score = sum([r.rating for r in all_ratings]) / total_count if total_count > 0 else 0.0
@@ -214,7 +211,7 @@ def rate_note(
     return existing_rating if existing_rating else new_rating
 
 
-# ৩. ইভেন্টে রেজিস্ট্রেশন করা (ফ্রি অথবা পেইড)
+# ৩. ইভেন্টে রেজিস্ট্রেশন করা (ফ্রি অথবা পেইড - পেমেন্ট করলে অটো APPROVED হবে)
 @router.post("/events/register", response_model=EventRegistrationResponse)
 def register_for_event(
     registration: EventRegistrationCreate,
@@ -238,19 +235,20 @@ def register_for_event(
         if not registration.transaction_id or not registration.payment_method:
             raise HTTPException(status_code=400, detail="Transaction ID and Payment Method are required for paid events")
         
+        # পেমেন্ট সফল হওয়ার সাথে সাথেই স্ট্যাটাস APPROVED করা হলো
         new_payment = Payment(
             user_id=user_id,
             amount=event.registration_fee,
             transaction_id=registration.transaction_id,
             payment_method=registration.payment_method,
-            status=PaymentStatus.PENDING
+            status=PaymentStatus.APPROVED
         )
         db.add(new_payment)
         db.commit()
         db.refresh(new_payment)
 
         payment_id = new_payment.id
-        payment_status = PaymentStatus.PENDING
+        payment_status = PaymentStatus.APPROVED
 
     new_registration = EventRegistration(
         event_id=registration.event_id,
@@ -306,7 +304,7 @@ def apply_for_job(
     return new_application
 
 
-# ৫. সকল নোট বা প্রশ্ন লিস্ট আকারে দেখা (ডিপার্টমেন্ট বা কোর্স কোড দিয়ে ফিল্টার করার সুবিধা সহ)
+# ৫. সকল নোট বা প্রশ্ন লিস্ট আকারে দেখা
 @router.get("/notes", response_model=List[NoteResponse])
 def get_all_notes(
     department: Optional[str] = None,

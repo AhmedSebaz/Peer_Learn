@@ -31,10 +31,10 @@ export default function RegistrationParticipants({ registrations = [] }) {
                   </td>
                   <td className="p-4 text-slate-600 font-medium">{reg.studentId}</td>
                   <td className="p-4 text-slate-800 font-semibold">{reg.event}</td>
-                  <td className="p-4 text-indigo-600 font-bold">{reg.ticket}</td>
+                  <td className="p-4 text-indigo-600 font-bold font-mono text-xs">{reg.ticket || 'N/A'}</td>
                   <td className="p-4">
                     <span className={`text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider ${
-                      reg.payment === 'Verified' 
+                      reg.payment === 'approved' || reg.payment === 'free' 
                         ? 'bg-emerald-100 text-emerald-700' 
                         : 'bg-amber-100 text-amber-700'
                     }`}>
@@ -45,8 +45,8 @@ export default function RegistrationParticipants({ registrations = [] }) {
               ))
             ) : (
               <tr>
-                <td colSpan="5" className="text-center py-12 text-slate-400 text-xs font-medium">
-                  কোনো রেজিস্ট্রেশন পাওয়া যায়নি।
+                <td colSpan="5" className="text-center py-16 text-slate-400 text-xs font-medium">
+                  কোনো রেজিস্ট্রেশন পাওয়া যায়নি।
                 </td>
               </tr>
             )}

@@ -11,17 +11,19 @@ export default function CreateEvent({ onEventCreated, onCancel }) {
     limit: '',
     fee: '',
     description: '',
-    image: null
+    imageFile: null,      // ব্যাকএন্ডে FormData-র জন্য ফাইল অবজেক্ট
+    previewImage: null    // ফ্রন্টএন্ডে ইমেজ প্রিভিউ দেখানোর জন্য
   });
-
-  const [previewImage, setPreviewImage] = useState(null);
 
   // Upload Event Banner হ্যান্ডলার
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setNewEvent({ ...newEvent, image: file });
-      setPreviewImage(URL.createObjectURL(file));
+      setNewEvent({ 
+        ...newEvent, 
+        imageFile: file, 
+        previewImage: URL.createObjectURL(file) 
+      });
     }
   };
 
@@ -46,8 +48,8 @@ export default function CreateEvent({ onEventCreated, onCancel }) {
           <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">Upload Event Banner</label>
           <div className="flex items-center space-x-4">
             <div className="relative w-36 h-24 bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden flex items-center justify-center group cursor-pointer hover:border-indigo-500 transition">
-              {previewImage ? (
-                <img src={previewImage} alt="Event Banner Preview" className="w-full h-full object-cover" />
+              {newEvent.previewImage ? (
+                <img src={newEvent.previewImage} alt="Event Banner Preview" className="w-full h-full object-cover" />
               ) : (
                 <div className="flex flex-col items-center text-slate-400 group-hover:text-indigo-600 transition">
                   <Upload className="w-5 h-5 mb-1" />
@@ -64,10 +66,10 @@ export default function CreateEvent({ onEventCreated, onCancel }) {
             <div className="text-xs text-slate-500 space-y-1">
               <p className="font-bold text-slate-800">ইভেন্টের ব্যানার ছবি যুক্ত করুন</p>
               <p>প্রস্তাবিত ফরম্যাট: PNG, JPG অথবা WEBP (সর্বোচ্চ ৫ মোবাইট)</p>
-              {previewImage && (
+              {newEvent.previewImage && (
                 <button 
                   type="button" 
-                  onClick={() => { setPreviewImage(null); setNewEvent({ ...newEvent, image: null }); }}
+                  onClick={() => setNewEvent({ ...newEvent, imageFile: null, previewImage: null })}
                   className="text-red-600 font-bold hover:underline pt-1 inline-block"
                 >
                   ছবি রিমুভ করুন

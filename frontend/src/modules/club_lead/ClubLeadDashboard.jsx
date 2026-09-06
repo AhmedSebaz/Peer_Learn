@@ -1,12 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Home, Calendar, PlusCircle, Settings, Users, CreditCard, 
   UserCheck, BarChart2, QrCode, LogOut 
 } from 'lucide-react';
 import { 
-  getInitialEvents, 
-  getInitialRegistrations, 
-  getInitialParticipants 
+  fetchClubEvents, 
+  createClubEvent, 
+  updateEventStatusApi, 
+  deleteEventApi, 
+  fetchRegistrations, 
+  fetchParticipants, 
+  updateAttendanceApi, 
+  verifyTicketApi, 
+  fetchAnalytics 
 } from './ClubLeadServices';
 
 // আলাদা করা কম্পোনেন্টগুলো ইমপোর্ট করা হলো
@@ -20,56 +26,106 @@ import QrCheckIn from './QrCheckIn';
 
 export default function ClubLeadDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('overview');
+  const clubId = user?.club_id || 1;
 
-  // সার্ভিস ফাইল থেকে ডেটা লোড
-  const [events, setEvents] = useState(getInitialEvents());
-  const [registrations, setRegistrations] = useState(getInitialRegistrations());
-  const [participants, setParticipants] = useState(getInitialParticipants());
+  // ডাইনামিক ডেটা স্টেট
+  const [events, setEvents] = useState([]);
+  const [registrations, setRegistrations] = useState([]);
+  const [participants, setParticipants] = useState([]);
+  const [analytics, setAnalytics] = useState({ totalEvents: 0, totalRegistrations: 0, totalRevenue: 0, checkInRate: 0 });
+  const [loading, setLoading] = useState(true);
 
-  // ইভেন্ট ক্রিয়েট হ্যান্ডলার
-  const handleEventCreated = (newEventData) => {
-    const created = {
-      id: events.length + 1,
-      title: newEventData.title,
-      date: newEventData.date,
-      time: newEventData.time,
-      venue: newEventData.venue,
-      limit: Number(newEventData.limit),
-      fee: Number(newEventData.fee),
-      status: 'Draft',
-      registrations: 0,
-      bannerImage: newEventData.previewImage || null
-    };
-    setEvents([created, ...events]);
-    alert('ইভেন্ট সফলভাবে তৈরি হয়েছে এবং ড্রাফট হিসেবে সংরক্ষিত হয়েছে!');
-    setActiveTab('manageEvents');
-  };
+  // ড্যাশবোর্ড ডেটা লোড করা
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      const eventsData = await fetchClubEvents(clubId);
+      const regsData = await fetchRegistrations(clubId);
+      const partsData = await fetchParticipants(clubId);
+      const analyticsData = await fetchAnalytics(clubId);
 
-  // ইভেন্ট স্ট্যাটাস পরিবর্তন
-  const toggleEventStatus = (id) => {
-    setEvents(events.map(ev => {
-      if (ev.id === id) {
-        return { ...ev, status: ev.status === 'Published' ? 'Draft' : 'Published' };
-      }
-      return ev;
-    }));
-  };
-
-  // ইভেন্ট ডিলিট
-  const deleteEvent = (id) => {
-    if (window.confirm("আপনি কি এই ইভেন্টটি ডিলিট করতে চান?")) {
-      setEvents(events.filter(ev => ev.id !== id));
+      setEvents(eventsData || []);
+      setRegistrations(regsData || []);
+      setParticipants(partsData || []);
+      setAnalytics(analyticsData || {});
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // উপস্থিতি (Attendance) টগল
-  const toggleAttendance = (id) => {
-    setParticipants(participants.map(p => {
-      if (p.id === id) {
-        return { ...p, attendance: p.attendance === 'Checked In' ? 'Not Checked In' : 'Checked In' };
+  useEffect(() => {
+    loadDashboardData();
+  }, [clubId]);
+
+  // নতুন ইভেন্ট ক্রিয়েট হ্যান্ডলার
+  const handleEventCreated = async (newEventData) => {
+    try {
+      await createClubEvent(newEventData, clubId);
+      alert('ইভেন্ট সফলভাবে তৈরি হয়েছে এবং ড্রাফট হিসেবে সংরক্ষিত হয়েছে!');
+      loadDashboardData();
+      setActiveTab('manageEvents');
+    } catch (error) {
+      alert('ইভেন্ট তৈরি করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    }
+  };
+
+  // ইভেন্ট স্ট্যাটাস পরিবর্তন
+  const toggleEventStatus = async (id) => {
+    const success = await updateEventStatusApi(id);
+    if (success) {
+      loadDashboardData();
+    }
+  };
+
+  // ইভেন্ট ডিলিট করা
+  const deleteEvent = async (id) => {
+    if (window.confirm("আপনি কি এই ইভেন্টটি ডিলিট করতে চান?")) {
+      const success = await deleteEventApi(id);
+      if (success) {
+        loadDashboardData();
       }
-      return p;
-    }));
+    }
+  };
+
+  // উপস্থিতি টগল করা
+  const toggleAttendance = async (id) => {
+    const success = await updateAttendanceApi(id);
+    if (success) {
+      loadDashboardData();
+    }
+  };
+
+  // স্মার্ট চেক-ইন হ্যান্ডলার
+  const handleVerifyTicket = async (query) => {
+    const { ok, data } = await verifyTicketApi(query);
+    if (ok) {
+      alert(data.message);
+      loadDashboardData();
+    } else {
+      alert(data.detail || "Verification failed!");
+    }
+  };
+
+  // CSV ফাইল ডাউনলোড হ্যান্ডলার
+  const handleExportCSV = () => {
+    if (registrations.length === 0) {
+      alert("ডাউনলোড করার মতো কোনো রেজিস্ট্রেশন ডেটা নেই!");
+      return;
+    }
+    
+    const headers = ["Student Name,Student ID,Event Title,Ticket Number,Payment Status,Payment Method\n"];
+    const rows = registrations.map(r => `"${r.student}","${r.studentId}","${r.event}","${r.ticket || 'N/A'}","${r.payment}","${r.paymentMethod || 'N/A'}"\n`);
+    
+    const blob = new Blob([...headers, ...rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `event_registrations_club_${clubId}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -137,144 +193,164 @@ export default function ClubLeadDashboard({ user, onLogout }) {
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
-        {/* 1. OVERVIEW TAB */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-8 text-white shadow-xl">
-              <p className="text-xs uppercase tracking-wider font-bold text-indigo-200 mb-1">Club Management Center</p>
-              <h2 className="text-3xl font-extrabold mb-2">Welcome back, Club Lead!</h2>
-              <p className="text-indigo-100 text-sm max-w-2xl mb-6">
-                Create university events, track registrations, verify transactions, manage participants and monitor event performance from one dashboard.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <button 
-                  onClick={() => setActiveTab('create')}
-                  className="bg-white text-indigo-600 px-5 py-2.5 rounded-xl text-sm font-bold shadow hover:bg-indigo-50 transition"
-                >
-                  + Create New Event
-                </button>
-                <button 
-                  onClick={() => setActiveTab('analytics')}
-                  className="bg-indigo-700/80 text-white px-5 py-2.5 rounded-xl text-sm font-bold border border-indigo-500 hover:bg-indigo-700 transition"
-                >
-                  View Analytics
-                </button>
+        {loading ? (
+          <div className="text-center py-20 text-slate-400 font-semibold text-sm">ডেটা লোড হচ্ছে...</div>
+        ) : (
+          <>
+            {/* 1. OVERVIEW TAB */}
+            {activeTab === 'overview' && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-8 text-white shadow-xl">
+                  <p className="text-xs uppercase tracking-wider font-bold text-indigo-200 mb-1">Club Management Center</p>
+                  <h2 className="text-3xl font-extrabold mb-2">Welcome back, Club Lead!</h2>
+                  <p className="text-indigo-100 text-sm max-w-2xl mb-6">
+                    Create university events, track registrations, verify transactions, manage participants and monitor event performance from one dashboard.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <button 
+                      onClick={() => setActiveTab('create')}
+                      className="bg-white text-indigo-600 px-5 py-2.5 rounded-xl text-sm font-bold shadow hover:bg-indigo-50 transition"
+                    >
+                      + Create New Event
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('analytics')}
+                      className="bg-indigo-700/80 text-white px-5 py-2.5 rounded-xl text-sm font-bold border border-indigo-500 hover:bg-indigo-700 transition"
+                    >
+                      View Analytics
+                    </button>
+                  </div>
+                </div>
+
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-indigo-600 uppercase">Total Events</p>
+                    <h3 className="text-3xl font-black text-slate-900 mt-1">{analytics.totalEvents || events.length}</h3>
+                    <p className="text-xs text-slate-500 mt-1">Created by your club</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-emerald-600 uppercase">Published Events</p>
+                    <h3 className="text-3xl font-black text-slate-900 mt-1">{events.filter(e => e.status === 'Published').length}</h3>
+                    <p className="text-xs text-slate-500 mt-1">Currently visible</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-purple-600 uppercase">Registrations</p>
+                    <h3 className="text-3xl font-black text-slate-900 mt-1">{analytics.totalRegistrations || registrations.length}</h3>
+                    <p className="text-xs text-slate-500 mt-1">Across all events</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-amber-600 uppercase">Total Revenue</p>
+                    <h3 className="text-3xl font-black text-slate-900 mt-1">৳{analytics.totalRevenue || 0}</h3>
+                    <p className="text-xs text-slate-500 mt-1">From verified payments</p>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Metrics Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <p className="text-xs font-bold text-indigo-600 uppercase">Total Events</p>
-                <h3 className="text-3xl font-black text-slate-900 mt-1">{events.length}</h3>
-                <p className="text-xs text-slate-500 mt-1">Created by your club</p>
+            {/* 2. EVENT CALENDAR TAB */}
+            {activeTab === 'calendar' && (
+              <EventCalendar events={events} onCreateEventClick={() => setActiveTab('create')} />
+            )}
+
+            {/* 3. CREATE EVENT TAB */}
+            {activeTab === 'create' && (
+              <CreateEvent 
+                onEventCreated={handleEventCreated} 
+                onCancel={() => setActiveTab('overview')} 
+              />
+            )}
+
+            {/* 4. MANAGE EVENTS TAB */}
+            {activeTab === 'manageEvents' && (
+              <ManageEvent 
+                events={events} 
+                onToggleStatus={toggleEventStatus} 
+                onDeleteEvent={deleteEvent} 
+                onCreateClick={() => setActiveTab('create')} 
+              />
+            )}
+
+            {/* 5. REGISTRATIONS TAB */}
+            {activeTab === 'registrations' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-extrabold text-slate-900">Event Registrations</h2>
+                    <p className="text-xs text-slate-500">View registered students and their event details automatically.</p>
+                  </div>
+                  <button 
+                    onClick={handleExportCSV}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow hover:bg-indigo-700 transition"
+                  >
+                    Download CSV
+                  </button>
+                </div>
+                <RegistrationParticipants registrations={registrations} />
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <p className="text-xs font-bold text-emerald-600 uppercase">Published Events</p>
-                <h3 className="text-3xl font-black text-slate-900 mt-1">{events.filter(e => e.status === 'Published').length}</h3>
-                <p className="text-xs text-slate-500 mt-1">Currently visible</p>
+            )}
+
+            {/* 6. PAYMENTS TAB */}
+            {activeTab === 'payments' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-extrabold text-slate-900">Payment Verification</h2>
+                  <p className="text-xs text-slate-500">Monitor transaction history and verified payment receipts.</p>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
+                        <th className="p-4">Student</th>
+                        <th className="p-4">Event</th>
+                        <th className="p-4">Amount</th>
+                        <th className="p-4">Transaction ID</th>
+                        <th className="p-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-sm">
+                      {registrations.map((reg) => (
+                        <tr key={reg.id} className="hover:bg-slate-50/50">
+                          <td className="p-4">
+                            <p className="font-bold text-slate-900">{reg.student}</p>
+                            <p className="text-xs text-slate-400">{reg.studentId}</p>
+                          </td>
+                          <td className="p-4 text-slate-800">{reg.event}</td>
+                          <td className="p-4 font-bold text-slate-900">৳{reg.amount || 0}</td>
+                          <td className="p-4 font-mono text-xs text-indigo-600">{reg.transactionId || 'N/A'}</td>
+                          <td className="p-4">
+                            <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${reg.payment === 'approved' || reg.payment === 'free' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {reg.payment}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <p className="text-xs font-bold text-purple-600 uppercase">Registrations</p>
-                <h3 className="text-3xl font-black text-slate-900 mt-1">{registrations.length}</h3>
-                <p className="text-xs text-slate-500 mt-1">Across all events</p>
-              </div>
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <p className="text-xs font-bold text-amber-600 uppercase">Total Revenue</p>
-                <h3 className="text-3xl font-black text-slate-900 mt-1">৳500</h3>
-                <p className="text-xs text-slate-500 mt-1">From verified payments</p>
-              </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* 2. EVENT CALENDAR TAB */}
-        {activeTab === 'calendar' && (
-          <EventCalendar events={events} onCreateEventClick={() => setActiveTab('create')} />
-        )}
+            {/* 7. PARTICIPANTS TAB */}
+            {activeTab === 'participants' && (
+              <Participants 
+                participants={participants} 
+                onToggleAttendance={toggleAttendance} 
+                onExportCSV={handleExportCSV} 
+              />
+            )}
 
-        {/* 3. CREATE EVENT TAB */}
-        {activeTab === 'create' && (
-          <CreateEvent 
-            onEventCreated={handleEventCreated} 
-            onCancel={() => setActiveTab('overview')} 
-          />
-        )}
+            {/* 8. ANALYTICS TAB */}
+            {activeTab === 'analytics' && (
+              <Analytics events={events} analytics={analytics} />
+            )}
 
-        {/* 4. MANAGE EVENTS TAB */}
-        {activeTab === 'manageEvents' && (
-          <ManageEvent 
-            events={events} 
-            onToggleStatus={toggleEventStatus} 
-            onDeleteEvent={deleteEvent} 
-            onCreateClick={() => setActiveTab('create')} 
-          />
-        )}
-
-        {/* 5. REGISTRATIONS TAB */}
-        {activeTab === 'registrations' && (
-          <RegistrationParticipants registrations={registrations} />
-        )}
-
-        {/* 6. PAYMENTS TAB */}
-        {activeTab === 'payments' && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-extrabold text-slate-900">Payment Verification</h2>
-              <p className="text-xs text-slate-500">Monitor transaction history and verified payment receipts.</p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
-                    <th className="p-4">Student</th>
-                    <th className="p-4">Event</th>
-                    <th className="p-4">Amount</th>
-                    <th className="p-4">Transaction ID</th>
-                    <th className="p-4">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {registrations.map((reg, idx) => (
-                    <tr key={reg.id} className="hover:bg-slate-50/50">
-                      <td className="p-4">
-                        <p className="font-bold text-slate-900">{reg.student}</p>
-                        <p className="text-xs text-slate-400">{reg.studentId}</p>
-                      </td>
-                      <td className="p-4 text-slate-800">{reg.event}</td>
-                      <td className="p-4 font-bold text-slate-900">৳200</td>
-                      <td className="p-4 font-mono text-xs text-indigo-600">TRX98765{idx}</td>
-                      <td className="p-4">
-                        <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${reg.payment === 'Verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {reg.payment}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* 7. PARTICIPANTS TAB */}
-        {activeTab === 'participants' && (
-          <Participants 
-            participants={participants} 
-            onToggleAttendance={toggleAttendance} 
-            onExportCSV={() => alert('Participant list exported to CSV successfully!')} 
-          />
-        )}
-
-        {/* 8. ANALYTICS TAB */}
-        {activeTab === 'analytics' && (
-          <Analytics events={events} />
-        )}
-
-        {/* 9. QR CHECK-IN TAB */}
-        {activeTab === 'checkin' && (
-          <QrCheckIn onVerifyTicket={(query) => alert(`Ticket/Student ID "${query}" verified and checked-in successfully!`)} />
+            {/* 9. QR CHECK-IN TAB */}
+            {activeTab === 'checkin' && (
+              <QrCheckIn onVerifyTicket={handleVerifyTicket} />
+            )}
+          </>
         )}
 
       </main>

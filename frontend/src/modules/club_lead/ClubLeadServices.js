@@ -1,21 +1,141 @@
-// ClubLeadServices.js - ক্লাব লিডারের ডামি ডেটা এবং এপিআই সার্ভিস ফাংশন
+// ClubLeadServices.js - ব্যাকএন্ড এপিআই সার্ভিস কানেক্টিভিটি
 
-export const getInitialEvents = () => [
-  { id: 1, title: 'AI & Career Development Workshop', date: '2026-08-30', time: '10:00', venue: 'University Auditorium', limit: 150, fee: 200, status: 'Published', registrations: 2 },
-  { id: 2, title: 'Inter University Coding Contest', date: '2026-09-05', time: '09:00', venue: 'CSE Lab Complex', limit: 100, fee: 300, status: 'Published', registrations: 2 },
-  { id: 3, title: 'Career Networking Session', date: '2026-09-10', time: '14:00', venue: 'Seminar Hall', limit: 200, fee: 0, status: 'Draft', registrations: 0 },
-];
+const API_BASE_URL = "http://localhost:8000/club-lead";
 
-export const getInitialRegistrations = () => [
-  { id: 1, student: 'Rahim Ahmed', email: 'rahim@student.edu', studentId: '22101234', event: 'AI & Career Development Workshop', ticket: 'PL-101', payment: 'Pending' },
-  { id: 2, student: 'Nusrat Jahan', email: 'nusrat@student.edu', studentId: '22104567', event: 'AI & Career Development Workshop', ticket: 'PL-102', payment: 'Verified' },
-  { id: 3, student: 'Tanvir Hasan', email: 'tanvir@student.edu', studentId: '23101987', event: 'Inter University Coding Contest', ticket: 'PL-103', payment: 'Verified' },
-  { id: 4, student: 'Sadia Islam', email: 'sadia@student.edu', studentId: '23102345', event: 'Inter University Coding Contest', ticket: 'PL-104', payment: 'Pending' },
-];
+// ১. সমস্ত ইভেন্ট ফেচ করা
+export const fetchClubEvents = async (clubId = 1) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/events/${clubId}`);
+    if (!response.ok) throw new Error("Failed to fetch events");
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching events:", error);
+    return [];
+  }
+};
 
-export const getInitialParticipants = () => [
-  { id: 1, student: 'Rahim Ahmed', studentId: '22101234', event: 'AI & Career Development Workshop', ticket: 'PL-101', payment: 'Pending', attendance: 'Not Checked In' },
-  { id: 2, student: 'Nusrat Jahan', studentId: '22104567', event: 'AI & Career Development Workshop', ticket: 'PL-102', payment: 'Verified', attendance: 'Checked In' },
-  { id: 3, student: 'Tanvir Hasan', studentId: '23101987', event: 'Inter University Coding Contest', ticket: 'PL-103', payment: 'Verified', attendance: 'Checked In' },
-  { id: 4, student: 'Sadia Islam', studentId: '23102345', event: 'Inter University Coding Contest', ticket: 'PL-104', payment: 'Pending', attendance: 'Not Checked In' },
-];
+// ২. নতুন ইভেন্ট তৈরি করা (FormData এবং ব্যানার ইমেজসহ)
+export const createClubEvent = async (eventData, clubId = 1) => {
+  try {
+    const formData = new FormData();
+    formData.append("club_id", clubId);
+    formData.append("event_title", eventData.title);
+    formData.append("venue", eventData.venue);
+    formData.append("event_date", eventData.date);
+    formData.append("start_time", eventData.time);
+    if (eventData.deadline) formData.append("deadline", eventData.deadline);
+    formData.append("seat_limit", eventData.limit);
+    formData.append("registration_fee", eventData.fee);
+    formData.append("description", eventData.description || "");
+    
+    if (eventData.imageFile) {
+      formData.append("banner", eventData.imageFile);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/events`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) throw new Error("Failed to create event");
+    return await response.json();
+  } catch (error) {
+    console.error("Error creating event:", error);
+    throw error;
+  }
+};
+
+// ৩. ইভেন্ট স্ট্যাটাস পরিবর্তন (Draft <-> Published)
+export const updateEventStatusApi = async (eventId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/events/${eventId}/status`, {
+      method: 'PATCH',
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("Error toggling status:", error);
+    return false;
+  }
+};
+
+// ৪. ইভেন্ট ডিলিট করা
+export const deleteEventApi = async (eventId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/events/${eventId}`, {
+      method: 'DELETE',
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("Error deleting event:", error);
+    return false;
+  }
+};
+
+// ৫. রেজিস্ট্রেশন লিস্ট ফেচ করা
+export const fetchRegistrations = async (clubId = 1) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/registrations/${clubId}`);
+    if (!response.ok) throw new Error("Failed to fetch registrations");
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching registrations:", error);
+    return [];
+  }
+};
+
+// ৬. পার্টিসিপেন্ট ও অ্যাটেনডেন্স লিস্ট ফেচ করা
+export const fetchParticipants = async (clubId = 1) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/participants/${clubId}`);
+    if (!response.ok) throw new Error("Failed to fetch participants");
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching participants:", error);
+    return [];
+  }
+};
+
+// ৭. উপস্থিতি বা চেক-ইন স্ট্যাটাস টগল করা
+export const updateAttendanceApi = async (registrationId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/attendance/${registrationId}`, {
+      method: 'PATCH',
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("Error updating attendance:", error);
+    return false;
+  }
+};
+
+// ৮. স্মার্ট চেক-ইন (টিকেট বা স্টুডেন্ট আইডি দিয়ে)
+export const verifyTicketApi = async (query) => {
+  try {
+    const formData = new URLSearchParams();
+    formData.append("ticket_or_student_id", query);
+
+    const response = await fetch(`${API_BASE_URL}/check-in`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formData,
+    });
+
+    const data = await response.json();
+    return { ok: response.ok, data };
+  } catch (error) {
+    console.error("Check-in error:", error);
+    return { ok: false, data: { detail: "সার্ভার কানেকশনে সমস্যা হয়েছে!" } };
+  }
+};
+
+// ৯. অ্যানালিটিক্স ডেটা ফেচ করা
+export const fetchAnalytics = async (clubId = 1) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/analytics/${clubId}`);
+    if (!response.ok) throw new Error("Failed to fetch analytics");
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching analytics:", error);
+    return { totalEvents: 0, totalRegistrations: 0, totalRevenue: 0, checkInRate: 0 };
+  }
+};

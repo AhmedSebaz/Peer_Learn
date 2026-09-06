@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlusCircle, Clock, MapPin, Users, Ticket, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PlusCircle, Clock, MapPin, Users, Ticket, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
 
 export default function EventCalendar({ events = [], onCreateEventClick }) {
   const monthsList = [
@@ -73,10 +73,11 @@ export default function EventCalendar({ events = [], onCreateEventClick }) {
     calendarDays.push({ day: i, date: dateStr, isCurrentMonth: false });
   }
 
-  // নির্দিষ্ট তারিখে কি ইভেন্ট আছে তা ফিল্টার করার জন্য
-  const selectedDateEvents = events.filter(ev => ev.date === selectedDate);
+  // নির্দিষ্ট তারিখে কি ইভেন্ট আছে তা ফিল্টার করার জন্য (backend properties: event_date)
+  const selectedDateEvents = events.filter(ev => ev.event_date === selectedDate);
   const currentMonthEvents = events.filter(ev => {
-    const [y, m] = ev.date.split('-').map(Number);
+    if (!ev.event_date) return false;
+    const [y, m] = ev.event_date.split('-').map(Number);
     return y === selectedYear && m === selectedMonth + 1;
   });
 
@@ -175,7 +176,7 @@ export default function EventCalendar({ events = [], onCreateEventClick }) {
           {/* Calendar Days */}
           <div className="grid grid-cols-7 gap-2">
             {calendarDays.map((item, index) => {
-              const dayEvents = events.filter(ev => ev.date === item.date);
+              const dayEvents = events.filter(ev => ev.event_date === item.date);
               const isSelected = selectedDate === item.date;
 
               return (
@@ -203,7 +204,7 @@ export default function EventCalendar({ events = [], onCreateEventClick }) {
                   <div className="space-y-1 mt-1">
                     {dayEvents.map((ev, i) => (
                       <div key={i} className="text-[10px] bg-indigo-600 text-white px-1.5 py-0.5 rounded font-semibold truncate shadow-sm">
-                        {ev.time} {ev.title}
+                        {ev.start_time || '00:00'} {ev.event_title}
                       </div>
                     ))}
                   </div>
@@ -227,18 +228,25 @@ export default function EventCalendar({ events = [], onCreateEventClick }) {
             {selectedDateEvents.length > 0 ? (
               selectedDateEvents.map((ev) => (
                 <div key={ev.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
+                  {/* Banner Image if available */}
+                  {ev.banner_url && (
+                    <div className="w-full h-28 rounded-xl overflow-hidden border border-slate-200">
+                      <img src={`http://localhost:8000${ev.banner_url}`} alt={ev.event_title} className="w-full h-full object-cover" />
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-start">
-                    <h4 className="font-bold text-slate-900 text-sm">{ev.title}</h4>
+                    <h4 className="font-bold text-slate-900 text-sm">{ev.event_title}</h4>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${ev.status === 'Published' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                       {ev.status}
                     </span>
                   </div>
 
                   <div className="space-y-1.5 text-xs text-slate-600">
-                    <p className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-indigo-600" /> {ev.time}</p>
-                    <p className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-indigo-600" /> {ev.venue}</p>
-                    <p className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-indigo-600" /> Capacity: {ev.limit}</p>
-                    <p className="flex items-center gap-1.5"><Ticket className="w-3.5 h-3.5 text-indigo-600" /> Fee: ৳{ev.fee}</p>
+                    <p className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-indigo-600" /> {ev.start_time || 'N/A'}</p>
+                    <p className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-indigo-600" /> {ev.venue || 'N/A'}</p>
+                    <p className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-indigo-600" /> Capacity: {ev.seat_limit}</p>
+                    <p className="flex items-center gap-1.5"><Ticket className="w-3.5 h-3.5 text-indigo-600" /> Fee: ৳{ev.registration_fee}</p>
                   </div>
                 </div>
               ))

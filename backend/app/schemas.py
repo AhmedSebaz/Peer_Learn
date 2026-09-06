@@ -11,7 +11,9 @@ from app.models import (
     JobType, 
     JobStatus, 
     ApplicationStatus, 
-    MentorshipStatus
+    MentorshipStatus,
+    EventStatus,        # নতুন ইভেন্ট স্ট্যাটাস (Draft / Published)
+    AttendanceStatus    # নতুন চেক-ইন স্ট্যাটাস
 )
 
 # --- User Schemas ---
@@ -64,7 +66,7 @@ class AlumniProfileCreate(BaseModel):
 class AlumniProfileResponse(AlumniProfileCreate):
     id: int
     user_id: int
-    profile_pic: Optional[str] = None  # <-- অ্যালুনি প্রফাইল পিকচার ফিল্ড যুক্ত করা হলো
+    profile_pic: Optional[str] = None
     alumni_id_card: Optional[str] = None
 
     class Config:
@@ -138,14 +140,20 @@ class PaymentResponse(PaymentCreate):
 # --- Event Schemas ---
 class EventCreate(BaseModel):
     event_title: str
+    venue: Optional[str] = None               # ভেন্যু ফিল্ড যুক্ত করা হলো
     event_date: date
+    start_time: Optional[str] = None          # স্টার্ট টাইম
+    deadline: Optional[date] = None           # রেজিস্ট্রেশন ডেডলাইন
     seat_limit: int = 50
     registration_fee: float = 0.00
     description: Optional[str] = None
+    status: Optional[EventStatus] = EventStatus.DRAFT
 
 class EventResponse(EventCreate):
     id: int
     club_id: int
+    banner_url: Optional[str] = None          # ইভেন্ট ব্যানার ইমেজ পাথ/ইউআরএল
+    status: EventStatus                       # ড্রাফট বা পাবলিশ স্ট্যাটাস
     is_active: bool
     created_at: datetime
 
@@ -167,6 +175,9 @@ class EventRegistrationResponse(BaseModel):
     payment_status: PaymentStatus
     transaction_id: Optional[str] = None
     payment_method: Optional[str] = None
+    ticket_number: Optional[str] = None       # ইউনিক টিকেট নম্বর (যেমন: PL-101)
+    attendance_status: AttendanceStatus       # চেক-ইন স্ট্যাটাস (Checked In / Not Checked In)
+    paid_amount: float                        # পেমেন্ট অ্যামাউন্ট
     registered_at: datetime
 
     class Config:

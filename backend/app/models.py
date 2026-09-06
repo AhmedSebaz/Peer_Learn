@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DECIMAL, Enum, TIMESTAMP, ForeignKey, CheckConstraint, Date, Boolean
+from sqlalchemy import Column, Integer, String, Text, DECIMAL, Enum, TIMESTAMP, ForeignKey, CheckConstraint, Date, Boolean, Time
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -18,12 +18,16 @@ class UserStatus(str, enum.Enum):
 class NoteType(str, enum.Enum):
     NOTES = "notes"
     QUESTION = "question"
+    UPPER_NOTES = "NOTES"
+    UPPER_QUESTION = "QUESTION"
 
 class NoteStatus(str, enum.Enum):
     PENDING = "pending"
     ACTIVE = "active"
     DELETED_BY_USER = "deleted_by_user"
     DELETED_BY_ADMIN = "deleted_by_admin"
+    UPPER_PENDING = "PENDING"
+    UPPER_ACTIVE = "ACTIVE"
 
 class PaymentStatus(str, enum.Enum):
     PENDING = "pending"
@@ -56,6 +60,17 @@ class MentorshipStatus(str, enum.Enum):
     PENDING = "pending"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
+
+class EventStatus(str, enum.Enum):
+    DRAFT = "Draft"
+    PUBLISHED = "Published"
+    UPPER_DRAFT = "DRAFT"
+    UPPER_PUBLISHED = "PUBLISHED"
+
+class AttendanceStatus(str, enum.Enum):
+    NOT_CHECKED_IN = "Not Checked In"
+    CHECKED_IN = "Checked In"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -126,7 +141,7 @@ class AlumniProfile(Base):
     current_job_title = Column(String(150), nullable=True)
     company = Column(String(150), nullable=True)
     linkedin_url = Column(String(255), nullable=True)
-    profile_pic = Column(String(255), nullable=True)  # <-- অ্যালুনি প্রফাইল পিকচার কলাম যুক্ত করা হলো
+    profile_pic = Column(String(255), nullable=True)
     alumni_id_card = Column(String(255), nullable=True)
 
     user = relationship("User", back_populates="alumni_profile")
@@ -151,7 +166,7 @@ class Payment(Base):
     amount = Column(DECIMAL(10, 2), nullable=False)
     transaction_id = Column(String(100), unique=True, nullable=False)
     payment_method = Column(String(50), nullable=False)
-    status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
+    status = Column(Enum(PaymentStatus, values_callable=lambda x: [e.value for e in x]), default=PaymentStatus.PENDING)
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     user = relationship("User", back_populates="payments")
@@ -166,12 +181,12 @@ class Note(Base):
     title = Column(String(150), nullable=False)
     department = Column(String(100), nullable=False)
     course_code = Column(String(50), nullable=False)
-    note_type = Column(Enum(NoteType), default=NoteType.NOTES, nullable=False)
+    note_type = Column(Enum(NoteType, values_callable=lambda x: [e.value for e in x]), default=NoteType.NOTES, nullable=False)
     file_path = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     rating = Column(DECIMAL(3, 2), default=0.00)
     total_ratings = Column(Integer, default=0)
-    status = Column(Enum(NoteStatus), default=NoteStatus.PENDING, nullable=False)  # <-- ডিফল্ট পেন্ডিং রাখা হলো
+    status = Column(Enum(NoteStatus, values_callable=lambda x: [e.value for e in x]), default=NoteStatus.PENDING, nullable=False)
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     user = relationship("User", back_populates="notes")
@@ -201,10 +216,15 @@ class Event(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     club_id = Column(Integer, ForeignKey("clubs.id", ondelete="CASCADE"), nullable=False)
     event_title = Column(String(150), nullable=False)
+    venue = Column(String(150), nullable=True)
     event_date = Column(Date, nullable=False)
+    start_time = Column(String(50), nullable=True)
+    deadline = Column(Date, nullable=True)
     seat_limit = Column(Integer, default=50, nullable=False)
     registration_fee = Column(DECIMAL(10, 2), default=0.00)
     description = Column(Text, nullable=True)
+    banner_url = Column(String(255), nullable=True)
+    status = Column(Enum(EventStatus, values_callable=lambda x: [e.value for e in x]), default=EventStatus.DRAFT, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
@@ -219,8 +239,13 @@ class EventRegistration(Base):
     event_id = Column(Integer, ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     payment_id = Column(Integer, ForeignKey("payments.id", ondelete="SET NULL"), nullable=True)
-    registration_type = Column(Enum(RegistrationType), default=RegistrationType.FREE)
-    payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.FREE)
+    
+    ticket_number = Column(String(50), unique=True, nullable=True)
+    attendance_status = Column(Enum(AttendanceStatus, values_callable=lambda x: [e.value for e in x]), default=AttendanceStatus.NOT_CHECKED_IN, nullable=False)
+    paid_amount = Column(DECIMAL(10, 2), default=0.00)
+    
+    registration_type = Column(Enum(RegistrationType, values_callable=lambda x: [e.value for e in x]), default=RegistrationType.FREE)
+    payment_status = Column(Enum(PaymentStatus, values_callable=lambda x: [e.value for e in x]), default=PaymentStatus.FREE)
     transaction_id = Column(String(100), nullable=True)
     payment_method = Column(String(50), nullable=True)
     registered_at = Column(TIMESTAMP, server_default=func.current_timestamp())
@@ -238,10 +263,10 @@ class JobPost(Base):
     job_title = Column(String(150), nullable=False)
     company_name = Column(String(150), nullable=False)
     location = Column(String(100), nullable=False)
-    job_type = Column(Enum(JobType), default=JobType.FULL_TIME, nullable=False)
+    job_type = Column(Enum(JobType, values_callable=lambda x: [e.value for e in x]), default=JobType.FULL_TIME, nullable=False)
     description = Column(Text, nullable=False)
     application_link = Column(String(255), nullable=False)
-    status = Column(Enum(JobStatus), default=JobStatus.PENDING, nullable=False)
+    status = Column(Enum(JobStatus, values_callable=lambda x: [e.value for e in x]), default=JobStatus.PENDING, nullable=False)
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     alumni = relationship("User", back_populates="job_posts")
@@ -256,7 +281,7 @@ class JobApplication(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     resume_path = Column(String(255), nullable=False)
     cover_letter = Column(Text, nullable=True)
-    status = Column(Enum(ApplicationStatus), default=ApplicationStatus.PENDING, nullable=False)
+    status = Column(Enum(ApplicationStatus, values_callable=lambda x: [e.value for e in x]), default=ApplicationStatus.PENDING, nullable=False)
     applied_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     job = relationship("JobPost", back_populates="applications")
@@ -266,12 +291,12 @@ class JobApplication(Base):
 class AlumniMentorshipRequest(Base):
     __tablename__ = "alumni_mentorship_requests"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # ব্যাকটিক্স সরিয়ে ঠিক করা হয়েছে
     student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     alumni_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     preferred_date = Column(Date, nullable=False)
     message = Column(Text, nullable=True)
-    status = Column(Enum(MentorshipStatus), default=MentorshipStatus.PENDING, nullable=False)
+    status = Column(Enum(MentorshipStatus, values_callable=lambda x: [e.value for e in x]), default=MentorshipStatus.PENDING, nullable=False)
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     student = relationship("User", foreign_keys=[student_id], back_populates="sent_mentorship_requests")
