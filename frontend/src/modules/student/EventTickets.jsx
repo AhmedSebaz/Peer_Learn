@@ -40,11 +40,11 @@ const EventTickets = ({ user }) => {
         </div>
         <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 15px 0;" />
         <div>
-          <h3 style="margin: 0 0 12px 0; color: #111827; font-size: 18px;">${evt.title}</h3>
+          <h3 style="margin: 0 0 12px 0; color: #111827; font-size: 18px;">${evt.title || evt.event_title}</h3>
           <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Attendee:</b> ${userName}</p>
-          <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Date:</b> ${evt.date}</p>
-          <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Venue:</b> ${evt.location}</p>
-          <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Ticket Fee:</b> ${evt.fee === 0 ? 'FREE' : '$' + evt.fee}</p>
+          <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Date:</b> ${evt.date || evt.event_date}</p>
+          <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Venue:</b> ${evt.location || evt.venue}</p>
+          <p style="margin: 6px 0; font-size: 14px; color: #374151;"><b>Ticket Fee:</b> ${(evt.fee === 0 || evt.registration_fee === 0) ? 'FREE' : '$' + (evt.fee || evt.registration_fee)}</p>
           <p style="margin: 6px 0; font-size: 14px; color: #059669;"><b>Status:</b> Confirmed & Registered</p>
         </div>
         <div style="text-align: center; margin-top: 25px; padding-top: 15px; border-top: 1px dashed #E5E7EB;">
@@ -55,7 +55,7 @@ const EventTickets = ({ user }) => {
 
     const opt = {
       margin: 10,
-      filename: `Ticket_${evt.title.replace(/\s+/g, '_')}.pdf`,
+      filename: `Ticket_${(evt.title || evt.event_title || 'event').replace(/\s+/g, '_')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'mm', format: 'a5', orientation: 'landscape' }
@@ -68,19 +68,19 @@ const EventTickets = ({ user }) => {
   const handleTicketClick = async (evt) => {
     const availableSeats = evt.seatLimit - evt.registeredCount;
     if (availableSeats <= 0) {
-      alert("দুঃখিত, এই ইভেন্টের সব সিট বুক হয়ে গেছে!");
+      alert("দুঃখিত, এই ইভেন্টের সব সিট বুক হয়ে গেছে!");
       return;
     }
 
     const userId = user?.id || user?.user_id || 1;
+    const eventFee = evt.fee !== undefined ? evt.fee : (evt.registration_fee || 0);
 
-    if (evt.fee === 0) {
+    if (eventFee === 0) {
       const response = await processEventPayment(evt.id, userId, "FREE", { paymentMethod: "FREE" });
       if (response && response.success) {
         setRegisteredEvents((prev) => ({ ...prev, [evt.id]: true }));
-        // সিট আপডেট করা
         setEvents(events.map(e => e.id === evt.id ? { ...e, registeredCount: e.registeredCount + 1 } : e));
-        alert(`Free registration successful for "${evt.title}"! You can now download your ticket.`);
+        alert(`Free registration successful for "${evt.title || evt.event_title}"! You can now download your ticket.`);
       } else {
         alert(response?.message || "Registration failed. Please try again.");
       }
@@ -109,17 +109,21 @@ const EventTickets = ({ user }) => {
     if (response && response.success) {
       setRegisteredEvents((prev) => ({ ...prev, [selectedEventForPay.id]: true }));
       setEvents(events.map(e => e.id === selectedEventForPay.id ? { ...e, registeredCount: e.registeredCount + 1 } : e));
-      alert(`Payment of $${selectedEventForPay.fee} via ${paymentMethod.toUpperCase()} successful!\nTicket confirmed for "${selectedEventForPay.title}".`);
+      const eventFee = selectedEventForPay.fee !== undefined ? selectedEventForPay.fee : selectedEventForPay.registration_fee;
+      alert(`Payment of $${eventFee} via ${paymentMethod.toUpperCase()} successful!\nTicket confirmed for "${selectedEventForPay.title || selectedEventForPay.event_title}".`);
       setSelectedEventForPay(null);
     } else {
       alert(response?.message || "Payment processing failed. Please try again.");
     }
   };
 
-  const filteredEvents = events.filter((evt) =>
-    evt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    evt.location.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // সঠিক ইভেন্ট স্টেট ব্যবহার করে ফিল্টারিং করা হলো
+  const filteredEvents = events.filter(evt => {
+    const title = evt?.event_title || evt?.title || "";
+    const location = evt?.venue || evt?.location || "";
+    const search = searchTerm || "";
+    return title.toLowerCase().includes(search.toLowerCase()) || location.toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <div className="space-y-6">
@@ -154,25 +158,29 @@ const EventTickets = ({ user }) => {
         {filteredEvents.map((evt) => {
           const isRegistered = registeredEvents[evt.id];
           const availableSeats = evt.seatLimit - evt.registeredCount;
+          const eventFee = evt.fee !== undefined ? evt.fee : (evt.registration_fee || 0);
+          const eventTitle = evt.event_title || evt.title || "Untitled Event";
+          const eventDate = evt.date || evt.event_date || "TBD";
+          const eventLocation = evt.location || evt.venue || "Online / Campus";
 
           return (
             <div key={evt.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
               <div className="p-6">
                 <div className="flex justify-between items-start">
                   <span className={`px-2.5 py-1 text-xs font-bold rounded-lg ${
-                    evt.fee === 0 
+                    eventFee === 0 
                       ? 'bg-green-50 text-green-700 border border-green-200' 
                       : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                   }`}>
-                    {evt.fee === 0 ? 'FREE' : `$${evt.fee}`}
+                    {eventFee === 0 ? 'FREE' : `$${eventFee}`}
                   </span>
                   <div className="flex items-center text-xs text-gray-500 space-x-1">
                     <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                    <span>{evt.date}</span>
+                    <span>{eventDate}</span>
                   </div>
                 </div>
 
-                <h3 className="font-bold text-gray-900 text-lg mt-3">{evt.title}</h3>
+                <h3 className="font-bold text-gray-900 text-lg mt-3">{eventTitle}</h3>
                 <p className="text-xs text-gray-500 mt-2 line-clamp-2">{evt.description}</p>
 
                 {/* Seat Availability Badge */}
@@ -188,7 +196,7 @@ const EventTickets = ({ user }) => {
 
                 <div className="mt-3 pt-2 flex items-center text-xs text-gray-600 space-x-1">
                   <MapPin className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>{evt.location}</span>
+                  <span>{eventLocation}</span>
                 </div>
               </div>
 
@@ -208,7 +216,7 @@ const EventTickets = ({ user }) => {
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center space-x-2 shadow-sm shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Ticket className="w-4 h-4" />
-                    <span>{availableSeats <= 0 ? 'Sold Out' : (evt.fee === 0 ? 'Register Free' : `Buy Ticket ($${evt.fee})`)}</span>
+                    <span>{availableSeats <= 0 ? 'Sold Out' : (eventFee === 0 ? 'Register Free' : `Buy Ticket ($${eventFee})`)}</span>
                   </button>
                 )}
               </div>
@@ -233,9 +241,9 @@ const EventTickets = ({ user }) => {
               <span>Checkout / Payment</span>
             </div>
             
-            <h3 className="text-lg font-bold text-gray-900">{selectedEventForPay.title}</h3>
+            <h3 className="text-lg font-bold text-gray-900">{selectedEventForPay.event_title || selectedEventForPay.title}</h3>
             <p className="text-xs text-gray-500 mt-1">
-              Total Payable Amount: <span className="text-indigo-600 font-bold text-sm">${selectedEventForPay.fee}</span>
+              Total Payable Amount: <span className="text-indigo-600 font-bold text-sm">${selectedEventForPay.fee !== undefined ? selectedEventForPay.fee : selectedEventForPay.registration_fee}</span>
             </p>
 
             <form onSubmit={handleConfirmPayment} className="mt-5 space-y-4">
@@ -279,7 +287,7 @@ const EventTickets = ({ user }) => {
                 type="submit"
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl text-sm transition-colors mt-2 shadow-lg shadow-indigo-100"
               >
-                Pay ${selectedEventForPay.fee} & Confirm Ticket
+                Pay ${selectedEventForPay.fee !== undefined ? selectedEventForPay.fee : selectedEventForPay.registration_fee} & Confirm Ticket
               </button>
             </form>
           </div>

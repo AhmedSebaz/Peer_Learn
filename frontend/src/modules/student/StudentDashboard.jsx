@@ -12,20 +12,47 @@ const StudentDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [currentUser, setCurrentUser] = useState(user);
   
-  // Profile Form State
+  // Profile Form State (ব্যাকএন্ড থেকে আসা রিয়েল ডেটা বা ডিফল্ট মান দিয়ে ইনিশিয়ালাইজ করা হলো)
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
-    department: user?.department || 'CSE',
-    batch: user?.batch || '',
-    bio: user?.bio || '',
-    linkedin: user?.linkedin || ''
+    department: user?.department || user?.student_profile?.department || 'CSE',
+    batch: user?.batch || user?.student_profile?.batch || '3.2',
+    bio: user?.bio || user?.student_profile?.bio || '',
+    linkedin: user?.linkedin || user?.student_profile?.linkedin || ''
   });
+
   const [profilePicFile, setProfilePicFile] = useState(null);
-  const [previewPic, setPreviewPic] = useState(user?.profile_pic ? `http://127.0.0.1:8000/${user.profile_pic}` : null);
+  
+  // সঠিক পাথ অনুযায়ী প্রফাইল পিকচার প্রিভিউ সেট করা
+  const getInitialProfilePic = () => {
+    const pic = user?.profile_pic || user?.student_profile?.profile_pic;
+    if (!pic) return null;
+    return pic.startsWith('http') ? pic : `http://127.0.0.1:8000/${pic}`;
+  };
+
+  const [previewPic, setPreviewPic] = useState(getInitialProfilePic());
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
 
   const currentUserId = user?.id || user?.user_id || 1;
+
+  // প্রপস বা ইউজারের ডেটা পরিবর্তন হলে স্টেট আপডেট করার জন্য
+  useEffect(() => {
+    if (user) {
+      setCurrentUser(user);
+      setProfileData({
+        name: user.name || '',
+        department: user.department || user.student_profile?.department || 'CSE',
+        batch: user.batch || user.student_profile?.batch || '3.2',
+        bio: user.bio || user.student_profile?.bio || '',
+        linkedin: user.linkedin || user.student_profile?.linkedin || ''
+      });
+      const pic = user.profile_pic || user.student_profile?.profile_pic;
+      if (pic) {
+        setPreviewPic(pic.startsWith('http') ? pic : `http://127.0.0.1:8000/${pic}`);
+      }
+    }
+  }, [user]);
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to log out of CampusConnect?")) {
@@ -59,12 +86,22 @@ const StudentDashboard = ({ user, onLogout }) => {
     setIsUpdatingProfile(false);
 
     if (res.success) {
-      setProfileMsg('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
-      setCurrentUser(prev => ({ ...prev, ...profileData, profile_pic: res.data?.profile_pic || prev?.profile_pic }));
+      setProfileMsg('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
+      const updatedData = res.data || {};
+      setCurrentUser(prev => ({ 
+        ...prev, 
+        ...profileData, 
+        profile_pic: updatedData.profile_pic || prev?.profile_pic 
+      }));
     } else {
-      setProfileMsg(res.message || 'প্রোফাইল আপডেট ব্যর্থ হয়েছে।');
+      setProfileMsg(res.message || 'প্রোফাইল আপডেট ব্যর্থ হয়েছে।');
     }
   };
+
+  // ডাইনামিক ডিপার্টমেন্ট ও সেমিস্টার নির্ধারণ
+  const userDept = currentUser?.department || currentUser?.student_profile?.department || 'CSE';
+  const userSemester = currentUser?.semester || currentUser?.student_profile?.batch || 'Semester 3.2';
+  const userName = currentUser?.name || 'Student';
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
@@ -81,7 +118,7 @@ const StudentDashboard = ({ user, onLogout }) => {
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </button>
 
-            {/* Profile Avatar & Info in Header (Clickable to go to Profile Tab) */}
+            {/* Profile Avatar & Info in Header */}
             <div 
               onClick={() => setActiveTab('profile')} 
               className="flex items-center space-x-2 border-l border-gray-200 pl-4 cursor-pointer group"
@@ -91,12 +128,12 @@ const StudentDashboard = ({ user, onLogout }) => {
                 {previewPic ? (
                   <img src={previewPic} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="font-bold text-indigo-700 text-sm">{currentUser?.name ? currentUser.name.charAt(0) : 'S'}</span>
+                  <span className="font-bold text-indigo-700 text-sm">{userName.charAt(0)}</span>
                 )}
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">{currentUser?.name || "MD Istiack"}</p>
-                <p className="text-[11px] text-gray-500">{currentUser?.department || "CSE"} • {currentUser?.semester || "Semester 3.2"}</p>
+                <p className="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">{userName}</p>
+                <p className="text-[11px] text-gray-500">{userDept} • {userSemester}</p>
               </div>
             </div>
 
@@ -147,7 +184,7 @@ const StudentDashboard = ({ user, onLogout }) => {
         {activeTab === 'home' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-8 text-white shadow-lg">
-              <h1 className="text-3xl font-extrabold mb-2">Welcome Back, {currentUser?.name || "MD Istiack"}! 👋</h1>
+              <h1 className="text-3xl font-extrabold mb-2">Welcome Back, {userName}! 👋</h1>
               <p className="text-indigo-100 text-sm max-w-2xl">
                 Here is what is happening in your campus today. Explore academic resources, connect with alumni mentors, or register for upcoming campus events!
               </p>
@@ -171,8 +208,8 @@ const StudentDashboard = ({ user, onLogout }) => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
                 <p className="text-xs font-bold text-indigo-600 uppercase">Current Term</p>
-                <h3 className="text-2xl font-black text-gray-900 mt-1">{currentUser?.semester || "Semester 3.2"}</h3>
-                <p className="text-xs text-gray-500 mt-2">B.Sc. in {currentUser?.department || "CSE"} • BUP</p>
+                <h3 className="text-2xl font-black text-gray-900 mt-1">{userSemester}</h3>
+                <p className="text-xs text-gray-500 mt-2">B.Sc. in {userDept} • BUP</p>
               </div>
               <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
                 <p className="text-xs font-bold text-green-600 uppercase">Account Status</p>
@@ -200,7 +237,7 @@ const StudentDashboard = ({ user, onLogout }) => {
         {/* 5. Career Tab */}
         {activeTab === 'career' && <CareerPortal user={currentUser} />}
 
-        {/* 6. Profile & Settings Tab (With Circle Avatar Click to Upload) */}
+        {/* 6. Profile & Settings Tab */}
         {activeTab === 'profile' && (
           <div className="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-gray-200">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Profile & Avatar Settings</h2>
@@ -223,7 +260,7 @@ const StudentDashboard = ({ user, onLogout }) => {
                   {previewPic ? (
                     <img src={previewPic} alt="Profile Preview" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-3xl font-bold text-indigo-600">{currentUser?.name?.charAt(0) || 'S'}</span>
+                    <span className="text-3xl font-bold text-indigo-600">{userName.charAt(0)}</span>
                   )}
                   
                   {/* Hover Overlay */}

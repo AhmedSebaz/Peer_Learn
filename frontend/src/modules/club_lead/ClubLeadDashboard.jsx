@@ -1,1407 +1,359 @@
-import React, { useEffect, useMemo, useState } from "react";
-import EventCalendar from "./EventCalendar.jsx";
-const defaultEvents = [
-  {
-    id: 1,
-    title: "AI & Career Development Workshop",
-    date: "2026-08-30",
-    time: "10:00",
-    venue: "University Auditorium",
-    capacity: 150,
-    fee: 200,
-    status: "Published",
-  },
-  {
-    id: 2,
-    title: "Inter University Coding Contest",
-    date: "2026-09-05",
-    time: "09:00",
-    venue: "CSE Lab Complex",
-    capacity: 100,
-    fee: 300,
-    status: "Published",
-  },
-  {
-    id: 3,
-    title: "Career Networking Session",
-    date: "2026-09-10",
-    time: "14:00",
-    venue: "Seminar Hall",
-    capacity: 200,
-    fee: 0,
-    status: "Draft",
-  },
-];
+import React, { useState, useEffect } from 'react';
+import { 
+  Home, Calendar, PlusCircle, Settings, Users, CreditCard, 
+  UserCheck, BarChart2, QrCode, LogOut 
+} from 'lucide-react';
+import { 
+  fetchClubEvents, 
+  createClubEvent, 
+  updateEventStatusApi, 
+  deleteEventApi, 
+  fetchRegistrations, 
+  fetchParticipants, 
+  updateAttendanceApi, 
+  verifyTicketApi, 
+  fetchAnalytics 
+} from './ClubLeadServices';
 
-const defaultRegistrations = [
-  {
-    id: 101,
-    eventId: 1,
-    name: "Rahim Ahmed",
-    studentId: "22101234",
-    email: "rahim@student.edu",
-    transactionId: "TXN845762",
-    amount: 200,
-    payment: "Pending",
-    ticketId: "PL-101",
-    checkedIn: false,
-  },
-  {
-    id: 102,
-    eventId: 1,
-    name: "Nusrat Jahan",
-    studentId: "22104567",
-    email: "nusrat@student.edu",
-    transactionId: "TXN845900",
-    amount: 200,
-    payment: "Verified",
-    ticketId: "PL-102",
-    checkedIn: false,
-  },
-  {
-    id: 103,
-    eventId: 2,
-    name: "Tanvir Hasan",
-    studentId: "23101987",
-    email: "tanvir@student.edu",
-    transactionId: "TXN901245",
-    amount: 300,
-    payment: "Verified",
-    ticketId: "PL-103",
-    checkedIn: true,
-  },
-  {
-    id: 104,
-    eventId: 2,
-    name: "Sadia Islam",
-    studentId: "23102345",
-    email: "sadia@student.edu",
-    transactionId: "TXN902211",
-    amount: 300,
-    payment: "Pending",
-    ticketId: "PL-104",
-    checkedIn: false,
-  },
-];
+// আলাদা করা কম্পোনেন্টগুলো ইমপোর্ট করা হলো
+import EventCalendar from './EventCalendar';
+import CreateEvent from './CreateEvent';
+import ManageEvent from './ManageEvent';
+import RegistrationParticipants from './RegistrationParticipants';
+import Participants from './Participants';
+import Analytics from './Analytics';
+import QrCheckIn from './QrCheckIn';
 
-function loadData(key, fallback) {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : fallback;
-  } catch {
-    return fallback;
-  }
-}
+export default function ClubLeadDashboard({ user, onLogout }) {
+  const [activeTab, setActiveTab] = useState('overview');
+  const clubId = user?.club_id || 1;
 
-function ClubLeadDashboard() {
-  const [activeTab, setActiveTab] = useState("Overview");
+  // ডাইনামিক ডেটা স্টেট
+  const [events, setEvents] = useState([]);
+  const [registrations, setRegistrations] = useState([]);
+  const [participants, setParticipants] = useState([]);
+  const [analytics, setAnalytics] = useState({ totalEvents: 0, totalRegistrations: 0, totalRevenue: 0, checkInRate: 0 });
+  const [loading, setLoading] = useState(true);
 
-  const [events, setEvents] = useState(() =>
-    loadData("peerlearn_events", defaultEvents)
-  );
+  // ড্যাশবোর্ড ডেটা লোড করা
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      const eventsData = await fetchClubEvents(clubId);
+      const regsData = await fetchRegistrations(clubId);
+      const partsData = await fetchParticipants(clubId);
+      const analyticsData = await fetchAnalytics(clubId);
 
-  const [registrations, setRegistrations] = useState(() =>
-    loadData("peerlearn_registrations", defaultRegistrations)
-  );
-
-  const [message, setMessage] = useState("");
-  const [ticketSearch, setTicketSearch] = useState("");
-  const [searchResult, setSearchResult] = useState(null);
-
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    date: "",
-    time: "",
-    venue: "",
-    deadline: "",
-    capacity: "",
-    fee: "",
-  });
+      setEvents(eventsData || []);
+      setRegistrations(regsData || []);
+      setParticipants(partsData || []);
+      setAnalytics(analyticsData || {});
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    localStorage.setItem("peerlearn_events", JSON.stringify(events));
-  }, [events]);
+    loadDashboardData();
+  }, [clubId]);
 
-  useEffect(() => {
-    localStorage.setItem(
-      "peerlearn_registrations",
-      JSON.stringify(registrations)
-    );
-  }, [registrations]);
-
-  const tabs = [
-    "Overview",
-    "Event Calendar",
-    "Create Event",
-    "Manage Events",
-    "Registrations",
-    "Payments",
-    "Participants",
-    "Analytics",
-    "QR Check-in",
-  ];
-
-  const publishedEvents = events.filter(
-    (event) => event.status === "Published"
-  );
-
-  const pendingPayments = registrations.filter(
-    (registration) => registration.payment === "Pending"
-  ).length;
-
-  const verifiedPayments = registrations.filter(
-    (registration) => registration.payment === "Verified"
-  ).length;
-
-  const totalRevenue = registrations
-    .filter((registration) => registration.payment === "Verified")
-    .reduce((total, item) => total + Number(item.amount || 0), 0);
-
-  const checkedInCount = registrations.filter(
-    (registration) => registration.checkedIn
-  ).length;
-
-  const getEvent = (eventId) =>
-    events.find((event) => event.id === eventId);
-
-  const getRegistrationCount = (eventId) =>
-    registrations.filter(
-      (registration) => registration.eventId === eventId
-    ).length;
-
-  const showMessage = (text) => {
-    setMessage(text);
-
-    setTimeout(() => {
-      setMessage("");
-    }, 2500);
+  // নতুন ইভেন্ট ক্রিয়েট হ্যান্ডলার
+  const handleEventCreated = async (newEventData) => {
+    try {
+      await createClubEvent(newEventData, clubId);
+      alert('ইভেন্ট সফলভাবে তৈরি হয়েছে এবং ড্রাফট হিসেবে সংরক্ষিত হয়েছে!');
+      loadDashboardData();
+      setActiveTab('manageEvents');
+    } catch (error) {
+      alert('ইভেন্ট তৈরি করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    }
   };
 
-  const handleCreateEvent = (e) => {
-    e.preventDefault();
+  // ইভেন্ট স্ট্যাটাস পরিবর্তন
+  const toggleEventStatus = async (id) => {
+    const success = await updateEventStatusApi(id);
+    if (success) {
+      loadDashboardData();
+    }
+  };
 
-    if (
-      !form.title ||
-      !form.date ||
-      !form.time ||
-      !form.venue ||
-      !form.capacity
-    ) {
-      showMessage("Please fill in all required fields.");
+  // ইভেন্ট ডিলিট করা
+  const deleteEvent = async (id) => {
+    if (window.confirm("আপনি কি এই ইভেন্টটি ডিলিট করতে চান?")) {
+      const success = await deleteEventApi(id);
+      if (success) {
+        loadDashboardData();
+      }
+    }
+  };
+
+  // উপস্থিতি টগল করা
+  const toggleAttendance = async (id) => {
+    const success = await updateAttendanceApi(id);
+    if (success) {
+      loadDashboardData();
+    }
+  };
+
+  // স্মার্ট চেক-ইন হ্যান্ডলার
+  const handleVerifyTicket = async (query) => {
+    const { ok, data } = await verifyTicketApi(query);
+    if (ok) {
+      alert(data.message);
+      loadDashboardData();
+    } else {
+      alert(data.detail || "Verification failed!");
+    }
+  };
+
+  // CSV ফাইল ডাউনলোড হ্যান্ডলার
+  const handleExportCSV = () => {
+    if (registrations.length === 0) {
+      alert("ডাউনলোড করার মতো কোনো রেজিস্ট্রেশন ডেটা নেই!");
       return;
     }
-
-    const newEvent = {
-      id: Date.now(),
-      title: form.title,
-      description: form.description,
-      date: form.date,
-      time: form.time,
-      venue: form.venue,
-      deadline: form.deadline,
-      capacity: Number(form.capacity),
-      fee: Number(form.fee || 0),
-      status: "Draft",
-    };
-
-    setEvents((previous) => [newEvent, ...previous]);
-
-    setForm({
-      title: "",
-      description: "",
-      date: "",
-      time: "",
-      venue: "",
-      deadline: "",
-      capacity: "",
-      fee: "",
-    });
-
-    showMessage("Event created successfully.");
-    setActiveTab("Manage Events");
-  };
-
-  const toggleEventStatus = (eventId) => {
-    setEvents((previous) =>
-      previous.map((event) =>
-        event.id === eventId
-          ? {
-              ...event,
-              status:
-                event.status === "Published" ? "Draft" : "Published",
-            }
-          : event
-      )
-    );
-
-    showMessage("Event status updated.");
-  };
-
-  const deleteEvent = (eventId) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this event?"
-    );
-
-    if (!confirmed) return;
-
-    setEvents((previous) =>
-      previous.filter((event) => event.id !== eventId)
-    );
-
-    setRegistrations((previous) =>
-      previous.filter(
-        (registration) => registration.eventId !== eventId
-      )
-    );
-
-    showMessage("Event deleted.");
-  };
-
-  const updatePayment = (registrationId, status) => {
-    setRegistrations((previous) =>
-      previous.map((registration) =>
-        registration.id === registrationId
-          ? {
-              ...registration,
-              payment: status,
-            }
-          : registration
-      )
-    );
-
-    showMessage(`Payment marked as ${status}.`);
-  };
-
-  const toggleCheckIn = (registrationId) => {
-    setRegistrations((previous) =>
-      previous.map((registration) =>
-        registration.id === registrationId
-          ? {
-              ...registration,
-              checkedIn: !registration.checkedIn,
-            }
-          : registration
-      )
-    );
-  };
-
-  const handleTicketSearch = () => {
-    const keyword = ticketSearch.trim().toLowerCase();
-
-    if (!keyword) {
-      setSearchResult(null);
-      return;
-    }
-
-    const found = registrations.find(
-      (registration) =>
-        registration.ticketId.toLowerCase() === keyword ||
-        registration.studentId.toLowerCase() === keyword
-    );
-
-    setSearchResult(found || "not-found");
-  };
-
-  const exportParticipants = () => {
-    const headers = [
-      "Name",
-      "Student ID",
-      "Email",
-      "Event",
-      "Ticket ID",
-      "Payment",
-      "Checked In",
-    ];
-
-    const rows = registrations.map((registration) => [
-      registration.name,
-      registration.studentId,
-      registration.email,
-      getEvent(registration.eventId)?.title || "Unknown Event",
-      registration.ticketId,
-      registration.payment,
-      registration.checkedIn ? "Yes" : "No",
-    ]);
-
-    const csv = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((cell) => `"${String(cell).replaceAll('"', '""')}"`)
-          .join(",")
-      )
-      .join("\n");
-
-    const blob = new Blob([csv], {
-      type: "text/csv;charset=utf-8;",
-    });
-
+    
+    const headers = ["Student Name,Student ID,Event Title,Ticket Number,Payment Status,Payment Method\n"];
+    const rows = registrations.map(r => `"${r.student}","${r.studentId}","${r.event}","${r.ticket || 'N/A'}","${r.payment}","${r.paymentMethod || 'N/A'}"\n`);
+    
+    const blob = new Blob([...headers, ...rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
-    link.href = url;
-    link.download = "peer-learn-participants.csv";
+    link.setAttribute("href", url);
+    link.setAttribute("download", `event_registrations_club_${clubId}.csv`);
+    document.body.appendChild(link);
     link.click();
-
-    URL.revokeObjectURL(url);
-
-    showMessage("Participant CSV exported.");
+    document.body.removeChild(link);
   };
-
-  const analytics = useMemo(() => {
-    return events.map((event) => {
-      const eventRegistrations = registrations.filter(
-        (registration) => registration.eventId === event.id
-      );
-
-      const verified = eventRegistrations.filter(
-        (registration) => registration.payment === "Verified"
-      );
-
-      const revenue = verified.reduce(
-        (total, registration) =>
-          total + Number(registration.amount || 0),
-        0
-      );
-
-      return {
-        ...event,
-        registrations: eventRegistrations.length,
-        verified: verified.length,
-        revenue,
-        percentage:
-          event.capacity > 0
-            ? Math.min(
-                (eventRegistrations.length / event.capacity) * 100,
-                100
-              )
-            : 0,
-      };
-    });
-  }, [events, registrations]);
-
-  const renderOverview = () => (
-    <>
-      <section className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl p-8 mb-8 shadow-lg">
-        <p className="text-indigo-100 font-medium mb-2">
-          CLUB MANAGEMENT CENTER
-        </p>
-
-        <h2 className="text-3xl font-bold">
-          Welcome back, Club Lead!
-        </h2>
-
-        <p className="text-indigo-100 mt-3 max-w-2xl">
-          Create university events, track registrations, verify
-          transactions, manage participants and monitor event
-          performance from one dashboard.
-        </p>
-
-        <div className="flex flex-wrap gap-3 mt-6">
-          <button
-            onClick={() => setActiveTab("Create Event")}
-            className="bg-white text-indigo-600 px-6 py-3 rounded-lg font-semibold hover:bg-indigo-50"
-          >
-            + Create New Event
-          </button>
-
-          <button
-            onClick={() => setActiveTab("Analytics")}
-            className="bg-indigo-500/40 border border-white/30 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-500/60"
-          >
-            View Analytics
-          </button>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          label="TOTAL EVENTS"
-          value={events.length}
-          description="Created by your club"
-        />
-
-        <StatCard
-          label="PUBLISHED EVENTS"
-          value={publishedEvents.length}
-          description="Currently visible"
-          accent="text-green-600"
-        />
-
-        <StatCard
-          label="REGISTRATIONS"
-          value={registrations.length}
-          description="Across all events"
-          accent="text-purple-600"
-        />
-
-        <StatCard
-          label="PENDING PAYMENTS"
-          value={pendingPayments}
-          description="Need verification"
-          accent="text-orange-600"
-        />
-      </section>
-
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white border rounded-xl p-6">
-          <p className="text-gray-500 text-sm font-semibold">
-            VERIFIED PAYMENTS
-          </p>
-
-          <h3 className="text-3xl font-bold mt-2">
-            {verifiedPayments}
-          </h3>
-
-          <p className="text-gray-500 mt-2 text-sm">
-            Approved transactions
-          </p>
-        </div>
-
-        <div className="bg-white border rounded-xl p-6">
-          <p className="text-gray-500 text-sm font-semibold">
-            TOTAL REVENUE
-          </p>
-
-          <h3 className="text-3xl font-bold mt-2">
-            ৳{totalRevenue}
-          </h3>
-
-          <p className="text-gray-500 mt-2 text-sm">
-            From verified payments
-          </p>
-        </div>
-
-        <div className="bg-white border rounded-xl p-6">
-          <p className="text-gray-500 text-sm font-semibold">
-            CHECKED-IN PARTICIPANTS
-          </p>
-
-          <h3 className="text-3xl font-bold mt-2">
-            {checkedInCount}
-          </h3>
-
-          <p className="text-gray-500 mt-2 text-sm">
-            Attendance recorded
-          </p>
-        </div>
-      </section>
-
-      <section className="bg-white border rounded-xl overflow-hidden">
-        <div className="px-6 py-5 border-b flex items-center justify-between">
-          <div>
-            <h3 className="text-xl font-bold">
-              Recent Events
-            </h3>
-
-            <p className="text-sm text-gray-500 mt-1">
-              Your latest club activities
-            </p>
-          </div>
-
-          <button
-            onClick={() => setActiveTab("Manage Events")}
-            className="text-indigo-600 font-semibold"
-          >
-            View All
-          </button>
-        </div>
-
-        <EventTable
-          events={events.slice(0, 4)}
-          registrations={registrations}
-          onManage={() => setActiveTab("Manage Events")}
-        />
-      </section>
-    </>
-  );
-
-  const renderCreateEvent = () => (
-    <section className="bg-white border rounded-2xl p-7">
-      <div className="mb-7">
-        <h2 className="text-2xl font-bold">
-          Create New Event
-        </h2>
-
-        <p className="text-gray-500 mt-1">
-          Add the event information and publish it later from
-          Manage Events.
-        </p>
-      </div>
-
-      <form
-        onSubmit={handleCreateEvent}
-        className="grid grid-cols-1 md:grid-cols-2 gap-6"
-      >
-        <FormField label="Event Title *">
-          <input
-            value={form.title}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                title: e.target.value,
-              })
-            }
-            className="input-style"
-            placeholder="e.g. AI Innovation Summit"
-          />
-        </FormField>
-
-        <FormField label="Venue *">
-          <input
-            value={form.venue}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                venue: e.target.value,
-              })
-            }
-            className="input-style"
-            placeholder="University Auditorium"
-          />
-        </FormField>
-
-        <FormField label="Event Date *">
-          <input
-            type="date"
-            value={form.date}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                date: e.target.value,
-              })
-            }
-            className="input-style"
-          />
-        </FormField>
-
-        <FormField label="Start Time *">
-          <input
-            type="time"
-            value={form.time}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                time: e.target.value,
-              })
-            }
-            className="input-style"
-          />
-        </FormField>
-
-        <FormField label="Registration Deadline">
-          <input
-            type="date"
-            value={form.deadline}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                deadline: e.target.value,
-              })
-            }
-            className="input-style"
-          />
-        </FormField>
-
-        <FormField label="Participant Limit *">
-          <input
-            type="number"
-            min="1"
-            value={form.capacity}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                capacity: e.target.value,
-              })
-            }
-            className="input-style"
-            placeholder="150"
-          />
-        </FormField>
-
-        <FormField label="Registration Fee (BDT)">
-          <input
-            type="number"
-            min="0"
-            value={form.fee}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                fee: e.target.value,
-              })
-            }
-            className="input-style"
-            placeholder="0"
-          />
-        </FormField>
-
-        <div className="md:col-span-2">
-          <FormField label="Event Description">
-            <textarea
-              value={form.description}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  description: e.target.value,
-                })
-              }
-              rows="5"
-              className="input-style resize-none"
-              placeholder="Write a short description about the event..."
-            />
-          </FormField>
-        </div>
-
-        <div className="md:col-span-2 flex gap-3">
-          <button
-            type="submit"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-7 py-3 rounded-lg font-semibold"
-          >
-            Create Event
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("Overview")}
-            className="border px-7 py-3 rounded-lg font-semibold text-gray-600 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
-    </section>
-  );
-
-  const renderManageEvents = () => (
-    <section>
-      <SectionHeader
-        title="Manage Events"
-        description="Publish, unpublish or remove your club events."
-        buttonText="+ Create Event"
-        onButton={() => setActiveTab("Create Event")}
-      />
-
-      <div className="grid gap-5">
-        {events.map((event) => (
-          <div
-            key={event.id}
-            className="bg-white border rounded-xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-5"
-          >
-            <div>
-              <div className="flex gap-3 items-center mb-2">
-                <h3 className="font-bold text-lg">
-                  {event.title}
-                </h3>
-
-                <StatusBadge status={event.status} />
-              </div>
-
-              <p className="text-gray-500 text-sm">
-                {event.date} • {event.time} • {event.venue}
-              </p>
-
-              <p className="text-gray-500 text-sm mt-2">
-                {getRegistrationCount(event.id)} / {event.capacity}{" "}
-                registrations • Fee: ৳{event.fee}
-              </p>
-            </div>
-
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => toggleEventStatus(event.id)}
-                className="border border-indigo-200 text-indigo-600 px-4 py-2 rounded-lg font-medium hover:bg-indigo-50"
-              >
-                {event.status === "Published"
-                  ? "Move to Draft"
-                  : "Publish"}
-              </button>
-
-              <button
-                onClick={() => deleteEvent(event.id)}
-                className="border border-red-200 text-red-600 px-4 py-2 rounded-lg font-medium hover:bg-red-50"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {events.length === 0 && (
-          <EmptyState text="No events have been created yet." />
-        )}
-      </div>
-    </section>
-  );
-
-  const renderRegistrations = () => (
-    <section>
-      <SectionHeader
-        title="Event Registrations"
-        description="View registered students and their event information."
-      />
-
-      <div className="bg-white border rounded-xl overflow-x-auto">
-        <table className="w-full text-left min-w-[900px]">
-          <thead className="bg-gray-50 text-gray-500 text-sm">
-            <tr>
-              <th className="p-4">Student</th>
-              <th className="p-4">Student ID</th>
-              <th className="p-4">Event</th>
-              <th className="p-4">Ticket</th>
-              <th className="p-4">Payment</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {registrations.map((registration) => (
-              <tr
-                key={registration.id}
-                className="border-t"
-              >
-                <td className="p-4">
-                  <p className="font-semibold">
-                    {registration.name}
-                  </p>
-
-                  <p className="text-sm text-gray-500">
-                    {registration.email}
-                  </p>
-                </td>
-
-                <td className="p-4">
-                  {registration.studentId}
-                </td>
-
-                <td className="p-4">
-                  {getEvent(registration.eventId)?.title ||
-                    "Unknown Event"}
-                </td>
-
-                <td className="p-4 font-medium text-indigo-600">
-                  {registration.ticketId}
-                </td>
-
-                <td className="p-4">
-                  <PaymentBadge status={registration.payment} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-
-  const renderPayments = () => (
-    <section>
-      <SectionHeader
-        title="Payment Verification"
-        description="Review submitted transaction IDs before approving registrations."
-      />
-
-      <div className="grid gap-4">
-        {registrations.map((registration) => (
-          <div
-            key={registration.id}
-            className="bg-white border rounded-xl p-5 flex flex-col lg:flex-row gap-5 lg:items-center justify-between"
-          >
-            <div>
-              <p className="font-bold">
-                {registration.name}
-              </p>
-
-              <p className="text-sm text-gray-500 mt-1">
-                {getEvent(registration.eventId)?.title}
-              </p>
-
-              <div className="flex flex-wrap gap-4 text-sm mt-3">
-                <span>
-                  Amount:{" "}
-                  <strong>৳{registration.amount}</strong>
-                </span>
-
-                <span>
-                  Transaction:{" "}
-                  <strong>
-                    {registration.transactionId}
-                  </strong>
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <PaymentBadge status={registration.payment} />
-
-              <button
-                onClick={() =>
-                  updatePayment(registration.id, "Verified")
-                }
-                className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700"
-              >
-                Verify
-              </button>
-
-              <button
-                onClick={() =>
-                  updatePayment(registration.id, "Rejected")
-                }
-                className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-medium hover:bg-red-100"
-              >
-                Reject
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-
-  const renderParticipants = () => (
-    <section>
-      <SectionHeader
-        title="Participant Management"
-        description="Manage attendance and export participant data."
-        buttonText="Export CSV"
-        onButton={exportParticipants}
-      />
-
-      <div className="bg-white border rounded-xl overflow-x-auto">
-        <table className="w-full text-left min-w-[850px]">
-          <thead className="bg-gray-50 text-sm text-gray-500">
-            <tr>
-              <th className="p-4">Participant</th>
-              <th className="p-4">Event</th>
-              <th className="p-4">Ticket</th>
-              <th className="p-4">Payment</th>
-              <th className="p-4">Attendance</th>
-              <th className="p-4">Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {registrations.map((registration) => (
-              <tr
-                key={registration.id}
-                className="border-t"
-              >
-                <td className="p-4">
-                  <p className="font-semibold">
-                    {registration.name}
-                  </p>
-
-                  <p className="text-gray-500 text-sm">
-                    {registration.studentId}
-                  </p>
-                </td>
-
-                <td className="p-4">
-                  {getEvent(registration.eventId)?.title}
-                </td>
-
-                <td className="p-4">
-                  {registration.ticketId}
-                </td>
-
-                <td className="p-4">
-                  <PaymentBadge status={registration.payment} />
-                </td>
-
-                <td className="p-4">
-                  {registration.checkedIn ? (
-                    <span className="text-green-600 font-semibold">
-                      Checked In
-                    </span>
-                  ) : (
-                    <span className="text-gray-500">
-                      Not Checked In
-                    </span>
-                  )}
-                </td>
-
-                <td className="p-4">
-                  <button
-                    disabled={
-                      registration.payment !== "Verified"
-                    }
-                    onClick={() =>
-                      toggleCheckIn(registration.id)
-                    }
-                    className={`px-4 py-2 rounded-lg font-medium ${
-                      registration.payment !== "Verified"
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : registration.checkedIn
-                        ? "bg-orange-50 text-orange-600"
-                        : "bg-indigo-600 text-white"
-                    }`}
-                  >
-                    {registration.checkedIn
-                      ? "Undo"
-                      : "Check In"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-
-  const renderAnalytics = () => (
-    <section>
-      <SectionHeader
-        title="Event Analytics"
-        description="Monitor registrations, occupancy and revenue."
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-7">
-        <StatCard
-          label="TOTAL REGISTRATIONS"
-          value={registrations.length}
-          description="All-time registrations"
-        />
-
-        <StatCard
-          label="VERIFIED REVENUE"
-          value={`৳${totalRevenue}`}
-          description="Approved payments"
-          accent="text-green-600"
-        />
-
-        <StatCard
-          label="CHECK-IN RATE"
-          value={
-            registrations.length
-              ? `${Math.round(
-                  (checkedInCount /
-                    registrations.length) *
-                    100
-                )}%`
-              : "0%"
-          }
-          description="Overall attendance"
-          accent="text-purple-600"
-        />
-      </div>
-
-      <div className="bg-white border rounded-xl p-6">
-        <h3 className="font-bold text-xl mb-6">
-          Event Performance
-        </h3>
-
-        <div className="space-y-7">
-          {analytics.map((event) => (
-            <div key={event.id}>
-              <div className="flex justify-between gap-5 mb-2">
-                <div>
-                  <p className="font-semibold">
-                    {event.title}
-                  </p>
-
-                  <p className="text-gray-500 text-sm">
-                    {event.registrations} registrations •{" "}
-                    {event.verified} verified • ৳
-                    {event.revenue} revenue
-                  </p>
-                </div>
-
-                <p className="font-bold">
-                  {Math.round(event.percentage)}%
-                </p>
-              </div>
-
-              <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden">
-                <div
-                  className="bg-indigo-600 h-full rounded-full"
-                  style={{
-                    width: `${event.percentage}%`,
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-
-  const renderCheckIn = () => (
-    <section>
-      <SectionHeader
-        title="Smart Ticket Check-in"
-        description="Search by Ticket ID or Student ID and instantly verify participants."
-      />
-
-      <div className="bg-gradient-to-r from-gray-900 to-indigo-950 rounded-2xl p-8 text-white">
-        <p className="text-indigo-200 font-medium">
-          PREMIUM CHECK-IN
-        </p>
-
-        <h3 className="text-2xl font-bold mt-2">
-          Verify Event Ticket
-        </h3>
-
-        <p className="text-gray-300 mt-2 max-w-xl">
-          Enter a ticket ID such as PL-102 or a student ID.
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-3 mt-6 max-w-2xl">
-          <input
-            value={ticketSearch}
-            onChange={(e) =>
-              setTicketSearch(e.target.value)
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                handleTicketSearch();
-              }
-            }}
-            placeholder="Ticket ID / Student ID"
-            className="flex-1 bg-white text-gray-900 rounded-lg px-4 py-3 outline-none"
-          />
-
-          <button
-            onClick={handleTicketSearch}
-            className="bg-indigo-500 hover:bg-indigo-400 px-6 py-3 rounded-lg font-semibold"
-          >
-            Verify Ticket
-          </button>
-        </div>
-      </div>
-
-      {searchResult === "not-found" && (
-        <div className="mt-6 bg-red-50 border border-red-200 text-red-700 rounded-xl p-5">
-          No valid participant was found for this ticket.
-        </div>
-      )}
-
-      {searchResult &&
-        searchResult !== "not-found" && (
-          <div className="mt-6 bg-white border rounded-xl p-6">
-            <div className="flex flex-col lg:flex-row gap-5 justify-between">
-              <div>
-                <p className="text-sm text-gray-500">
-                  PARTICIPANT
-                </p>
-
-                <h3 className="text-2xl font-bold mt-1">
-                  {searchResult.name}
-                </h3>
-
-                <p className="text-gray-500 mt-1">
-                  {searchResult.studentId}
-                </p>
-
-                <p className="mt-4">
-                  <strong>Event:</strong>{" "}
-                  {getEvent(searchResult.eventId)?.title}
-                </p>
-
-                <p className="mt-1">
-                  <strong>Ticket:</strong>{" "}
-                  {searchResult.ticketId}
-                </p>
-              </div>
-
-              <div className="flex flex-col items-start lg:items-end gap-3">
-                <PaymentBadge
-                  status={searchResult.payment}
-                />
-
-                {searchResult.checkedIn && (
-                  <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">
-                    Already Checked In
-                  </span>
-                )}
-
-                <button
-                  disabled={
-                    searchResult.payment !== "Verified"
-                  }
-                  onClick={() => {
-                    toggleCheckIn(searchResult.id);
-
-                    setSearchResult((previous) => ({
-                      ...previous,
-                      checkedIn: !previous.checkedIn,
-                    }));
-                  }}
-                  className={`px-5 py-3 rounded-lg font-semibold ${
-                    searchResult.payment !== "Verified"
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      : "bg-indigo-600 text-white hover:bg-indigo-700"
-                  }`}
-                >
-                  {searchResult.checkedIn
-                    ? "Undo Check-in"
-                    : "Confirm Check-in"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-    </section>
-  );
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-bold">
-              PL
-            </div>
-
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
+      {/* Top Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="bg-indigo-600 text-white p-2 rounded-xl font-bold text-lg shadow-md">PL</div>
             <div>
-              <h1 className="font-bold text-xl">
-                Peer-Learn Club Portal
-              </h1>
-
-              <p className="text-gray-500 text-sm">
-                Club Event Management
-              </p>
+              <h1 className="text-base font-bold text-slate-900 leading-tight">Peer-Learn Club Portal</h1>
+              <p className="text-xs text-slate-500">Club Event Management</p>
             </div>
           </div>
 
-          <div className="text-right">
-            <p className="font-semibold">
-              Club Lead
-            </p>
-
-            <p className="text-gray-500 text-sm">
-              Computer Club
-            </p>
+          <div className="flex items-center space-x-4">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-bold text-slate-900">Club Lead</p>
+              <p className="text-xs text-indigo-600 font-medium">{user?.club_name || "Computer Club"}</p>
+            </div>
+            <button 
+              onClick={onLogout}
+              className="flex items-center space-x-1 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition border border-red-100"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Logout</span>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {message && (
-          <div className="fixed top-5 right-5 z-50 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-xl">
-            {message}
-          </div>
+      {/* Navigation Tabs Bar */}
+      <div className="bg-white border-b border-slate-200 shadow-sm sticky top-16 z-10 overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 py-3 whitespace-nowrap">
+          {[
+            { id: 'overview', label: 'Overview', icon: Home },
+            { id: 'calendar', label: 'Event Calendar', icon: Calendar },
+            { id: 'create', label: 'Create Event', icon: PlusCircle },
+            { id: 'manageEvents', label: 'Manage Events', icon: Settings },
+            { id: 'registrations', label: 'Registrations', icon: Users },
+            { id: 'payments', label: 'Payments', icon: CreditCard },
+            { id: 'participants', label: 'Participants', icon: UserCheck },
+            { id: 'analytics', label: 'Analytics', icon: BarChart2 },
+            { id: 'checkin', label: 'QR Check-in', icon: QrCode },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${
+                  activeTab === tab.id
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
+        {loading ? (
+          <div className="text-center py-20 text-slate-400 font-semibold text-sm">ডেটা লোড হচ্ছে...</div>
+        ) : (
+          <>
+            {/* 1. OVERVIEW TAB */}
+            {activeTab === 'overview' && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-8 text-white shadow-xl">
+                  <p className="text-xs uppercase tracking-wider font-bold text-indigo-200 mb-1">Club Management Center</p>
+                  <h2 className="text-3xl font-extrabold mb-2">Welcome back, Club Lead!</h2>
+                  <p className="text-indigo-100 text-sm max-w-2xl mb-6">
+                    Create university events, track registrations, verify transactions, manage participants and monitor event performance from one dashboard.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <button 
+                      onClick={() => setActiveTab('create')}
+                      className="bg-white text-indigo-600 px-5 py-2.5 rounded-xl text-sm font-bold shadow hover:bg-indigo-50 transition"
+                    >
+                      + Create New Event
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('analytics')}
+                      className="bg-indigo-700/80 text-white px-5 py-2.5 rounded-xl text-sm font-bold border border-indigo-500 hover:bg-indigo-700 transition"
+                    >
+                      View Analytics
+                    </button>
+                  </div>
+                </div>
+
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-indigo-600 uppercase">Total Events</p>
+                    <h3 className="text-3xl font-black text-slate-900 mt-1">{analytics.totalEvents || events.length}</h3>
+                    <p className="text-xs text-slate-500 mt-1">Created by your club</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-emerald-600 uppercase">Published Events</p>
+                    <h3 className="text-3xl font-black text-slate-900 mt-1">{events.filter(e => e.status === 'Published').length}</h3>
+                    <p className="text-xs text-slate-500 mt-1">Currently visible</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-purple-600 uppercase">Registrations</p>
+                    <h3 className="text-3xl font-black text-slate-900 mt-1">{analytics.totalRegistrations || registrations.length}</h3>
+                    <p className="text-xs text-slate-500 mt-1">Across all events</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-amber-600 uppercase">Total Revenue</p>
+                    <h3 className="text-3xl font-black text-slate-900 mt-1">৳{analytics.totalRevenue || 0}</h3>
+                    <p className="text-xs text-slate-500 mt-1">From verified payments</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. EVENT CALENDAR TAB */}
+            {activeTab === 'calendar' && (
+              <EventCalendar events={events} onCreateEventClick={() => setActiveTab('create')} />
+            )}
+
+            {/* 3. CREATE EVENT TAB */}
+            {activeTab === 'create' && (
+              <CreateEvent 
+                onEventCreated={handleEventCreated} 
+                onCancel={() => setActiveTab('overview')} 
+              />
+            )}
+
+            {/* 4. MANAGE EVENTS TAB */}
+            {activeTab === 'manageEvents' && (
+              <ManageEvent 
+                events={events} 
+                onToggleStatus={toggleEventStatus} 
+                onDeleteEvent={deleteEvent} 
+                onCreateClick={() => setActiveTab('create')} 
+              />
+            )}
+
+            {/* 5. REGISTRATIONS TAB */}
+            {activeTab === 'registrations' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-extrabold text-slate-900">Event Registrations</h2>
+                    <p className="text-xs text-slate-500">View registered students and their event details automatically.</p>
+                  </div>
+                  <button 
+                    onClick={handleExportCSV}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow hover:bg-indigo-700 transition"
+                  >
+                    Download CSV
+                  </button>
+                </div>
+                <RegistrationParticipants registrations={registrations} />
+              </div>
+            )}
+
+            {/* 6. PAYMENTS TAB */}
+            {activeTab === 'payments' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-extrabold text-slate-900">Payment Verification</h2>
+                  <p className="text-xs text-slate-500">Monitor transaction history and verified payment receipts.</p>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
+                        <th className="p-4">Student</th>
+                        <th className="p-4">Event</th>
+                        <th className="p-4">Amount</th>
+                        <th className="p-4">Transaction ID</th>
+                        <th className="p-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-sm">
+                      {registrations.map((reg) => (
+                        <tr key={reg.id} className="hover:bg-slate-50/50">
+                          <td className="p-4">
+                            <p className="font-bold text-slate-900">{reg.student}</p>
+                            <p className="text-xs text-slate-400">{reg.studentId}</p>
+                          </td>
+                          <td className="p-4 text-slate-800">{reg.event}</td>
+                          <td className="p-4 font-bold text-slate-900">৳{reg.amount || 0}</td>
+                          <td className="p-4 font-mono text-xs text-indigo-600">{reg.transactionId || 'N/A'}</td>
+                          <td className="p-4">
+                            <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${reg.payment === 'approved' || reg.payment === 'free' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {reg.payment}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 7. PARTICIPANTS TAB */}
+            {activeTab === 'participants' && (
+              <Participants 
+                participants={participants} 
+                onToggleAttendance={toggleAttendance} 
+                onExportCSV={handleExportCSV} 
+              />
+            )}
+
+            {/* 8. ANALYTICS TAB */}
+            {activeTab === 'analytics' && (
+              <Analytics events={events} analytics={analytics} />
+            )}
+
+            {/* 9. QR CHECK-IN TAB */}
+            {activeTab === 'checkin' && (
+              <QrCheckIn onVerifyTicket={handleVerifyTicket} />
+            )}
+          </>
         )}
 
-        <nav className="bg-white border rounded-xl p-2 flex gap-2 overflow-x-auto mb-8">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`whitespace-nowrap px-5 py-3 rounded-lg font-medium transition ${
-                activeTab === tab
-                  ? "bg-indigo-600 text-white shadow"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
-
-        {activeTab === "Overview" &&
-          renderOverview()}
-
-        {activeTab === "Event Calendar" && (
-  <EventCalendar
-    events={events}
-    onCreateEvent={() =>
-      setActiveTab("Create Event")
-    }
-  />
-)} 
-
-        {activeTab === "Create Event" &&
-          renderCreateEvent()}
-
-        {activeTab === "Manage Events" &&
-          renderManageEvents()}
-
-        {activeTab === "Registrations" &&
-          renderRegistrations()}
-
-        {activeTab === "Payments" &&
-          renderPayments()}
-
-        {activeTab === "Participants" &&
-          renderParticipants()}
-
-        {activeTab === "Analytics" &&
-          renderAnalytics()}
-
-        {activeTab === "QR Check-in" &&
-          renderCheckIn()}
       </main>
     </div>
   );
 }
-
-function StatCard({
-  label,
-  value,
-  description,
-  accent = "text-indigo-600",
-}) {
-  return (
-    <div className="bg-white border rounded-xl p-6">
-      <p className={`text-sm font-semibold ${accent}`}>
-        {label}
-      </p>
-
-      <h3 className="text-3xl font-bold mt-2">
-        {value}
-      </h3>
-
-      <p className="text-gray-500 text-sm mt-2">
-        {description}
-      </p>
-    </div>
-  );
-}
-
-function FormField({ label, children }) {
-  return (
-    <label className="block">
-      <span className="block font-semibold text-sm mb-2">
-        {label}
-      </span>
-
-      {children}
-    </label>
-  );
-}
-
-function SectionHeader({
-  title,
-  description,
-  buttonText,
-  onButton,
-}) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-      <div>
-        <h2 className="text-2xl font-bold">
-          {title}
-        </h2>
-
-        <p className="text-gray-500 mt-1">
-          {description}
-        </p>
-      </div>
-
-      {buttonText && (
-        <button
-          onClick={onButton}
-          className="bg-indigo-600 text-white px-5 py-3 rounded-lg font-semibold hover:bg-indigo-700"
-        >
-          {buttonText}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function StatusBadge({ status }) {
-  return (
-    <span
-      className={`px-3 py-1 text-xs font-semibold rounded-full ${
-        status === "Published"
-          ? "bg-green-100 text-green-700"
-          : "bg-yellow-100 text-yellow-700"
-      }`}
-    >
-      {status}
-    </span>
-  );
-}
-
-function PaymentBadge({ status }) {
-  const classes =
-    status === "Verified"
-      ? "bg-green-100 text-green-700"
-      : status === "Rejected"
-      ? "bg-red-100 text-red-700"
-      : "bg-yellow-100 text-yellow-700";
-
-  return (
-    <span
-      className={`px-3 py-1 text-xs font-semibold rounded-full ${classes}`}
-    >
-      {status}
-    </span>
-  );
-}
-
-function EmptyState({ text }) {
-  return (
-    <div className="bg-white border rounded-xl p-10 text-center text-gray-500">
-      {text}
-    </div>
-  );
-}
-
-function EventTable({
-  events,
-  registrations,
-  onManage,
-}) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left min-w-[750px]">
-        <thead className="bg-gray-50 text-gray-500 text-sm">
-          <tr>
-            <th className="px-6 py-4">Event</th>
-            <th className="px-6 py-4">Date</th>
-            <th className="px-6 py-4">
-              Registrations
-            </th>
-            <th className="px-6 py-4">Status</th>
-            <th className="px-6 py-4">Action</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {events.map((event) => {
-            const total = registrations.filter(
-              (registration) =>
-                registration.eventId === event.id
-            ).length;
-
-            return (
-              <tr
-                key={event.id}
-                className="border-t"
-              >
-                <td className="px-6 py-4 font-semibold">
-                  {event.title}
-                </td>
-
-                <td className="px-6 py-4 text-gray-600">
-                  {event.date}
-                </td>
-
-                <td className="px-6 py-4">
-                  {total} / {event.capacity}
-                </td>
-
-                <td className="px-6 py-4">
-                  <StatusBadge status={event.status} />
-                </td>
-
-                <td className="px-6 py-4">
-                  <button
-                    onClick={onManage}
-                    className="text-indigo-600 font-semibold"
-                  >
-                    Manage
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-export default ClubLeadDashboard;

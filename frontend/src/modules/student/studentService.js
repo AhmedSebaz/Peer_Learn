@@ -63,7 +63,7 @@ export const getAcademicResources = async (department = '', courseCode = '') => 
         uploadedBy: item.user_id ? `User #${item.user_id}` : 'Unknown',
         downloads: item.downloads || 0,
         fileName: item.file_path ? item.file_path.split('/').pop() : 'Document.pdf',
-        // পূর্ণাঙ্গ ফাইল পাথ বা ইউআরএল সেট করা হলো যাতে ভিউ বা ডাউনলোড করা যায়
+        // পূর্ণাঙ্গ ফাইল পাথ বা ইউআরএল সেট করা হলো যাতে ভিউ বা ডাউনলোড করা যায়
         filePath: item.file_path ? (item.file_path.startsWith('http') ? item.file_path : `${API_BASE_URL}/${item.file_path}`) : null,
         description: item.description
       }));
@@ -219,7 +219,8 @@ export const processEventPayment = async (eventId, userId, registrationType = "F
       },
       body: JSON.stringify({
         event_id: eventId,
-        registration_type: registrationType,
+        // এখানে .toLowerCase() নিশ্চিত করা হলো যাতে ব্যাকএন্ডের 'free' বা 'paid' এনামের সাথে ম্যাচ করে
+        registration_type: (registrationType || "free").toLowerCase(),
         transaction_id: paymentDetails.transactionId || null,
         payment_method: paymentDetails.paymentMethod || null
       }),

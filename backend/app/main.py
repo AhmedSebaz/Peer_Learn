@@ -51,9 +51,9 @@ app.add_middleware(
 # বর্তমান ফাইলগুলো অনুযায়ী রাউটারগুলো রেজিস্টার করা হলো
 app.include_router(auth.router)
 app.include_router(student.router)
-# app.include_router(admin.router)
+app.include_router(admin.router)
 # app.include_router(alumni.router)
-# app.include_router(club_lead.router)
+app.include_router(club_lead.router)
 
 # রুট বা হোম এন্ডপয়েন্ট
 @app.get("/")

@@ -48,13 +48,15 @@ def verify_user_status(user_id: int, db: Session):
     return user
 
 
-# ১. স্টুডেন্ট প্রোফাইল তৈরি বা আপডেট করা (আইডি কার্ড সহ)
+# ১. স্টুডেন্ট প্রোফাইল তৈরি বা আপডেট করা (আইডি কার্ড, বায়ো ও লিঙ্কডইন সহ)
 @router.post("/profile", response_model=StudentProfileResponse)
 def create_or_update_student_profile(
-    student_id: str = Form(...),
-    department: str = Form(...),
-    batch: str = Form(...),
-    semester: str = Form(...),
+    student_id: Optional[str] = Form(None),
+    department: Optional[str] = Form(None),
+    batch: Optional[str] = Form(None),
+    semester: Optional[str] = Form(None),
+    bio: Optional[str] = Form(None),
+    linkedin: Optional[str] = Form(None),
     profile_pic: Optional[UploadFile] = File(None),
     student_id_card: Optional[UploadFile] = File(None),
     user_id: int = Form(...), 
@@ -82,10 +84,12 @@ def create_or_update_student_profile(
     profile = db.query(StudentProfile).filter(StudentProfile.user_id == user_id).first()
     
     if profile:
-        profile.student_id = student_id
-        profile.department = department
-        profile.batch = batch
-        profile.semester = semester
+        if student_id: profile.student_id = student_id
+        if department: profile.department = department
+        if batch: profile.batch = batch
+        if semester: profile.semester = semester
+        if bio is not None: profile.bio = bio
+        if linkedin is not None: profile.linkedin = linkedin
         if profile_pic_path:
             profile.profile_pic = profile_pic_path
         if id_card_path:
@@ -93,10 +97,12 @@ def create_or_update_student_profile(
     else:
         profile = StudentProfile(
             user_id=user_id,
-            student_id=student_id,
-            department=department,
-            batch=batch,
-            semester=semester,
+            student_id=student_id or f"BUP-{user_id}",
+            department=department or "CSE",
+            batch=batch or "3.2",
+            semester=semester or "3.2",
+            bio=bio,
+            linkedin=linkedin,
             profile_pic=profile_pic_path,
             student_id_card=id_card_path
         )
@@ -124,7 +130,6 @@ def upload_note(
 
     final_course_code = course_code or course or "CSE-3201"
     
-    # নোট টাইপ নিশ্চিত করা যাতে বড় হাতের বা সঠিক ফরম্যাটে সেভ হয়
     clean_note_type = (note_type or "NOTES").upper()
     if clean_note_type not in ["NOTES", "QUESTION", "QUESTIONS"]:
         clean_note_type = "NOTES"
@@ -177,7 +182,6 @@ def rate_note(
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
 
-    # ইউজার ইতিমধ্যে রেট করেছে কিনা চেক করা
     existing_rating = db.query(NoteRating).filter(
         NoteRating.note_id == note_id,
         NoteRating.user_id == user_id
@@ -195,7 +199,6 @@ def rate_note(
 
     db.commit()
 
-    # এভারেজ রেটিং এবং মোট রেটিং সংখ্যা আপডেট করা
     all_ratings = db.query(NoteRating).filter(NoteRating.note_id == note_id).all()
     total_count = len(all_ratings)
     avg_score = sum([r.rating for r in all_ratings]) / total_count if total_count > 0 else 0.0
@@ -208,7 +211,7 @@ def rate_note(
     return existing_rating if existing_rating else new_rating
 
 
-# ৩. ইভেন্টে রেজিস্ট্রেশন করা (ফ্রি অথবা পেইড)
+# ৩. ইভেন্টে রেজিস্ট্রেশন করা (ফ্রি অথবা পেইড - পেমেন্ট করলে অটো APPROVED হবে)
 @router.post("/events/register", response_model=EventRegistrationResponse)
 def register_for_event(
     registration: EventRegistrationCreate,
@@ -232,19 +235,20 @@ def register_for_event(
         if not registration.transaction_id or not registration.payment_method:
             raise HTTPException(status_code=400, detail="Transaction ID and Payment Method are required for paid events")
         
+        # পেমেন্ট সফল হওয়ার সাথে সাথেই স্ট্যাটাস APPROVED করা হলো
         new_payment = Payment(
             user_id=user_id,
             amount=event.registration_fee,
             transaction_id=registration.transaction_id,
             payment_method=registration.payment_method,
-            status=PaymentStatus.PENDING
+            status=PaymentStatus.APPROVED
         )
         db.add(new_payment)
         db.commit()
         db.refresh(new_payment)
 
         payment_id = new_payment.id
-        payment_status = PaymentStatus.PENDING
+        payment_status = PaymentStatus.APPROVED
 
     new_registration = EventRegistration(
         event_id=registration.event_id,
@@ -300,7 +304,7 @@ def apply_for_job(
     return new_application
 
 
-# ৫. সকল নোট বা প্রশ্ন লিস্ট আকারে দেখা (ডিপার্টমেন্ট বা কোর্স কোড দিয়ে ফিল্টার করার সুবিধা সহ)
+# ৫. সকল নোট বা প্রশ্ন লিস্ট আকারে দেখা
 @router.get("/notes", response_model=List[NoteResponse])
 def get_all_notes(
     department: Optional[str] = None,
