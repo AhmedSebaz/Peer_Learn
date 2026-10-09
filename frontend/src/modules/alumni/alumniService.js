@@ -1,4 +1,3 @@
-
 // Mock service file handling API interactions for the Alumni module
 
 export const fetchAlumniProfile = async () => {
@@ -26,12 +25,45 @@ export const fetchMentorshipRequests = async () => {
   ];
 };
 
+export const fetchJobApplications = async () => {
+  return [
+    {
+      id: 1,
+      jobTitle: "Frontend Developer",
+      company: "Tech Solutions Ltd.",
+      applicantName: "MD Istiack Ahmed",
+      studentId: "24524203102",
+      department: "CSE, BUP",
+      coverLetter: "I have strong experience in React, Tailwind CSS, and FastAPI integrations. Eager to contribute to your team!",
+      resumePath: "#",
+      status: "Pending",
+      appliedAt: "2026-09-05"
+    },
+    {
+      id: 2,
+      jobTitle: "Software Engineer Intern",
+      company: "Innovate BD",
+      applicantName: "Rahim Ahmed",
+      studentId: "24524203105",
+      department: "ICT, BUP",
+      coverLetter: "Passionate about algorithms and backend development. Solved 500+ problems on Codeforces.",
+      resumePath: "#",
+      status: "Shortlisted",
+      appliedAt: "2026-09-04"
+    }
+  ];
+};
+
 export const createSlot = async (slotData) => {
   return { id: Date.now(), ...slotData, isBooked: false };
 };
 
 export const updateRequestStatus = async (requestId, status) => {
   return { requestId, status, success: true };
+};
+
+export const updateApplicationStatus = async (appId, status) => {
+  return { appId, status, success: true };
 };
 
 export const submitJobPosting = async (jobData) => {

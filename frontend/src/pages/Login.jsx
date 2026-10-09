@@ -8,12 +8,12 @@ export default function Login({ onLoginSuccess, onSwitchToRegister }) {
   const [role, setRole] = useState('student');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    // authService থেকে ইমপোর্ট করা ফাংশন দিয়ে চেক করা হচ্ছে
-    const matchedUser = authenticateUser(email, password, role);
+    // যেহেতু ব্যাকএন্ড কল করা হচ্ছে, তাই await ব্যবহার করা হয়েছে
+    const matchedUser = await authenticateUser(email, password, role);
 
     if (matchedUser) {
       localStorage.setItem('campusconnect_user', JSON.stringify(matchedUser));
@@ -21,7 +21,7 @@ export default function Login({ onLoginSuccess, onSwitchToRegister }) {
         onLoginSuccess(matchedUser);
       }
     } else {
-      setError('Invalid Email, Password, or Role combination!');
+      setError('Invalid Email, Password, or Role combination! (অথবা অ্যাকাউন্টটি এখনো অ্যাপ্রুভ হয়নি)');
     }
   };
 
@@ -33,15 +33,20 @@ export default function Login({ onLoginSuccess, onSwitchToRegister }) {
       setPassword(demo.password);
       setRole(demo.role);
       setError('');
+    } else if (demoRole === 'student') {
+      // স্টুডেন্টের জন্য রিয়েল ব্যাকএন্ড টেস্ট অ্যাকাউন্ট
+      setEmail("student@bup.edu.bd");
+      setPassword("123");
+      setRole("student");
+      setError('');
     }
   };
 
-  // সাইন-আপে যাওয়ার হ্যান্ডলার (প্রপস না থাকলে লোকাল স্টেট দিয়ে টগল বা পেজ রিলেটেড কাজ করবে)
+  // সাইন-আপে যাওয়ার হ্যান্ডলার
   const handleRegisterClick = () => {
     if (onSwitchToRegister) {
       onSwitchToRegister();
     } else {
-      // যদি মূল ফাইলে প্রপস পাস করা না থাকে, তবে লোকালস্টোরেজে সাইনআপ মোড অন করে পেজ রিলোড বা টগল করতে পারো
       localStorage.setItem('campusconnect_auth_mode', 'register');
       window.location.reload();
     }
@@ -121,10 +126,10 @@ export default function Login({ onLoginSuccess, onSwitchToRegister }) {
                 onChange={(e) => setRole(e.target.value)}
                 className="block w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 font-medium text-slate-800"
               >
-                <option value="student">Student Portal</option>
-                <option value="admin">Admin Dashboard</option>
-                <option value="alumni">Alumni Portal</option>
-                <option value="club_lead">Club Leader Portal</option>
+                <option value="student">student</option>
+                <option value="admin">admin</option>
+                <option value="alumni">alumni</option>
+                <option value="club_lead">club_lead</option>
               </select>
             </div>
 
