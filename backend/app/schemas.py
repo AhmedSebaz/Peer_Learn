@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
-from datetime import date, datetime
+from datetime import date, time, datetime
 from app.models import (
     UserRole, 
     UserStatus, 
@@ -12,11 +12,14 @@ from app.models import (
     JobStatus, 
     ApplicationStatus, 
     MentorshipStatus,
-    EventStatus,        # নতুন ইভেন্ট স্ট্যাটাস (Draft / Published)
-    AttendanceStatus    # নতুন চেক-ইন স্ট্যাটাস
+    EventStatus,        # ইভেন্ট স্ট্যাটাস (Draft / Published)
+    AttendanceStatus    # চেক-ইন স্ট্যাটাস
 )
 
-# --- User Schemas ---
+# ==============================================================================
+# 1. COMMON & AUTHENTICATION SCHEMAS
+# ==============================================================================
+
 class UserBase(BaseModel):
     name: str
     email: EmailStr
@@ -37,8 +40,27 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
+# Common Payment Schemas
+class PaymentCreate(BaseModel):
+    amount: float
+    transaction_id: str
+    payment_method: str
 
-# --- Student Profile Schemas ---
+class PaymentResponse(PaymentCreate):
+    id: int
+    user_id: int
+    status: PaymentStatus
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ==============================================================================
+# 2. STUDENT MODULE SCHEMAS
+# ==============================================================================
+
+# --- Student Profile ---
 class StudentProfileCreate(BaseModel):
     student_id: Optional[str] = None
     department: str
@@ -56,38 +78,7 @@ class StudentProfileResponse(StudentProfileCreate):
     class Config:
         from_attributes = True
 
-# --- Alumni Profile Schemas ---
-class AlumniProfileCreate(BaseModel):
-    passing_year: int
-    current_job_title: Optional[str] = None
-    company: Optional[str] = None
-    linkedin_url: Optional[str] = None
-
-class AlumniProfileResponse(AlumniProfileCreate):
-    id: int
-    user_id: int
-    profile_pic: Optional[str] = None
-    alumni_id_card: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
-
-# --- Club Schemas ---
-class ClubCreate(BaseModel):
-    club_name: str
-    description: Optional[str] = None
-
-class ClubResponse(ClubCreate):
-    id: int
-    lead_user_id: int
-    approval_document: Optional[str] = None  # নতুন অ্যাট্রিবিউট যুক্ত করা হলো
-
-    class Config:
-        from_attributes = True
-
-
-# --- Notes & Questions Schemas ---
+# --- Student Academic Notes & Questions ---
 class NoteCreate(BaseModel):
     title: str
     department: str
@@ -107,8 +98,6 @@ class NoteResponse(NoteCreate):
     class Config:
         from_attributes = True
 
-
-# --- Note Rating Schemas ---
 class NoteRatingCreate(BaseModel):
     rating: int = Field(..., ge=1, le=5)
 
@@ -121,47 +110,37 @@ class NoteRatingResponse(NoteRatingCreate):
     class Config:
         from_attributes = True
 
+# --- Student Mentorship Request ---
+class MentorshipRequestCreate(BaseModel):
+    alumni_id: int
+    preferred_date: date
+    message: Optional[str] = None
 
-# --- Payment Schemas ---
-class PaymentCreate(BaseModel):
-    amount: float
-    transaction_id: str
-    payment_method: str
-
-class PaymentResponse(PaymentCreate):
+class MentorshipRequestResponse(MentorshipRequestCreate):
     id: int
+    student_id: int
+    status: MentorshipStatus
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# --- Student Job Application ---
+class JobApplicationCreate(BaseModel):
+    cover_letter: Optional[str] = None
+
+class JobApplicationResponse(JobApplicationCreate):
+    id: int
+    job_id: int
     user_id: int
-    status: PaymentStatus
-    created_at: datetime
+    resume_path: str
+    status: ApplicationStatus
+    applied_at: datetime
 
     class Config:
         from_attributes = True
 
-
-# --- Event Schemas ---
-class EventCreate(BaseModel):
-    event_title: str
-    venue: Optional[str] = None               # ভেন্যু ফিল্ড যুক্ত করা হলো
-    event_date: date
-    start_time: Optional[str] = None          # স্টার্ট টাইম
-    deadline: Optional[date] = None           # রেজিস্ট্রেশন ডেডলাইন
-    seat_limit: int = 50
-    registration_fee: float = 0.00
-    description: Optional[str] = None
-    status: Optional[EventStatus] = EventStatus.DRAFT
-
-class EventResponse(EventCreate):
-    id: int
-    club_id: int
-    banner_url: Optional[str] = None          # ইভেন্ট ব্যানার ইমেজ পাথ/ইউআরএল
-    approval_copy: Optional[str] = None       # নতুন অ্যাট্রিবিউট যুক্ত করা হলো
-    status: EventStatus                       # ড্রাফট বা পাবলিশ স্ট্যাটাস
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
+# --- Student Event Registration ---
 class EventRegistrationCreate(BaseModel):
     event_id: int
     registration_type: RegistrationType = RegistrationType.FREE
@@ -177,16 +156,73 @@ class EventRegistrationResponse(BaseModel):
     payment_status: PaymentStatus
     transaction_id: Optional[str] = None
     payment_method: Optional[str] = None
-    ticket_number: Optional[str] = None       # ইউনিক টিকেট নম্বর (যেমন: PL-101)
-    attendance_status: AttendanceStatus       # চেক-ইন স্ট্যাটাস (Checked In / Not Checked In)
-    paid_amount: float                        # পেমেন্ট অ্যামাউন্ট
+    ticket_number: Optional[str] = None
+    attendance_status: AttendanceStatus
+    paid_amount: float
     registered_at: datetime
 
     class Config:
         from_attributes = True
 
 
-# --- Job Post Schemas ---
+# ==============================================================================
+# 3. ALUMNI MODULE SCHEMAS
+# ==============================================================================
+
+# --- Alumni Profile ---
+class AlumniProfileCreate(BaseModel):
+    passing_year: int
+    current_job_title: Optional[str] = None
+    company: Optional[str] = None
+    linkedin_url: Optional[str] = None
+
+class AlumniProfileUpdate(BaseModel):
+    current_job_title: Optional[str] = None
+    company: Optional[str] = None
+    linkedin_url: Optional[str] = None
+
+class AlumniProfileResponse(AlumniProfileCreate):
+    id: int
+    user_id: int
+    profile_pic: Optional[str] = None
+    alumni_id_card: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+# --- Alumni Mentorship Availability Slots ---
+class MentorshipSlotCreate(BaseModel):
+    available_date: date
+    start_time: time
+    end_time: time
+
+class MentorshipSlotResponse(MentorshipSlotCreate):
+    id: int
+    alumni_id: int
+    is_booked: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# --- Alumni Reviewing Mentorship Requests ---
+class MentorshipStatusUpdate(BaseModel):
+    status: MentorshipStatus
+
+class MentorshipRequestDetailResponse(BaseModel):
+    id: int
+    student_id: int
+    student_name: str
+    student_email: str
+    preferred_date: date
+    message: Optional[str] = None
+    status: MentorshipStatus
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# --- Alumni Job Opportunities & Application Review ---
 class JobPostCreate(BaseModel):
     job_title: str
     company_name: str
@@ -204,16 +240,17 @@ class JobPostResponse(JobPostCreate):
     class Config:
         from_attributes = True
 
+class JobApplicationStatusUpdate(BaseModel):
+    status: ApplicationStatus
 
-# --- Job Application Schemas ---
-class JobApplicationCreate(BaseModel):
-    cover_letter: Optional[str] = None
-
-class JobApplicationResponse(JobApplicationCreate):
+class JobApplicationDetailResponse(BaseModel):
     id: int
     job_id: int
-    user_id: int
+    applicant_id: int
+    applicant_name: str
+    applicant_email: str
     resume_path: str
+    cover_letter: Optional[str] = None
     status: ApplicationStatus
     applied_at: datetime
 
@@ -221,17 +258,57 @@ class JobApplicationResponse(JobApplicationCreate):
         from_attributes = True
 
 
-# --- Alumni Mentorship Request Schemas ---
-class MentorshipRequestCreate(BaseModel):
-    alumni_id: int
-    preferred_date: date
-    message: Optional[str] = None
+# ==============================================================================
+# 4. CLUB MODULE SCHEMAS
+# ==============================================================================
 
-class MentorshipRequestResponse(MentorshipRequestCreate):
+# --- Club Profile & Registration ---
+class ClubCreate(BaseModel):
+    club_name: str
+    description: Optional[str] = None
+
+class ClubResponse(ClubCreate):
     id: int
-    student_id: int
-    status: MentorshipStatus
+    lead_user_id: int
+    approval_document: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+# --- Club Events Management ---
+class EventCreate(BaseModel):
+    event_title: str
+    venue: Optional[str] = None
+    event_date: date
+    start_time: Optional[str] = None
+    deadline: Optional[date] = None
+    seat_limit: int = 50
+    registration_fee: float = 0.00
+    description: Optional[str] = None
+    status: Optional[EventStatus] = EventStatus.DRAFT
+
+class EventResponse(EventCreate):
+    id: int
+    club_id: int
+    banner_url: Optional[str] = None
+    approval_copy: Optional[str] = None
+    status: EventStatus
+    is_active: bool
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+# ==============================================================================
+# 5. ADMIN MODULE SCHEMAS (Moderation & Approvals)
+# ==============================================================================
+
+class UserStatusUpdate(BaseModel):
+    status: UserStatus
+
+class NoteStatusUpdate(BaseModel):
+    status: NoteStatus
+
+class JobStatusUpdate(BaseModel):
+    status: JobStatus

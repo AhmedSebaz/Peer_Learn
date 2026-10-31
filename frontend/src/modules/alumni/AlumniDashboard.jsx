@@ -1,44 +1,99 @@
-import React, { useState } from 'react';
-import { 
-  Home, 
-  Calendar, 
-  Users, 
-  Briefcase, 
-  Bell, 
-  PlusCircle, 
-  LogOut, 
-  Edit3, 
-  Check, 
-  X,
-  FileText
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Home, Calendar, Users, Briefcase, Bell, PlusCircle, LogOut, Edit3, X,FileText} 
+from 'lucide-react';
 import SlotManager from './SlotManager';
 import MentorshipRequests from './MentorshipRequests';
 import PostJobModal from './PostJobModal';
-import ViewApplications from './ViewApplications'; // নতুন امپورট
+import ViewApplications from './ViewApplications';
+
+// Alumni API Services Import
+import { 
+  fetchAlumniProfile, 
+  updateAlumniProfile, 
+  fetchSlots, 
+  fetchMentorshipRequests 
+} from './alumniService';
 
 export default function AlumniDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Dynamic Profile State
   const [userProfile, setUserProfile] = useState({
-    name: user?.name || "Alex Morgan",
-    role: user?.role || "Senior Software Engineer",
-    batch: user?.batch || "Class of '21",
-    department: user?.department || "CSE"
+    name: user?.name || "Alumni",
+    role: user?.current_job_title || "Software Engineer",
+    company: user?.company || "",
+    batch: user?.passing_year ? `Class of '${String(user.passing_year).slice(-2)}` : "Alumni",
+    linkedin: user?.linkedin_url || ""
   });
 
   // Edit Profile Form State
   const [editForm, setEditForm] = useState({ ...userProfile });
 
+  // Overview Counts State (Connected with live APIs)
+  const [dashboardStats, setDashboardStats] = useState({
+    activeSlotsCount: 0,
+    pendingRequestsCount: 0
+  });
+
+  // Initial Backend Data Fetch
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        setLoading(true);
+        // প্রোফাইল, স্লট এবং মেন্টরশিপ রিকোয়েস্ট ফেচ করা
+        const [profileData, slotsData, requestsData] = await Promise.allSettled([
+          fetchAlumniProfile(),
+          fetchSlots(),
+          fetchMentorshipRequests()
+        ]);
+
+        if (profileData.status === "fulfilled" && profileData.value) {
+          const p = profileData.value;
+          setUserProfile(prev => ({
+            ...prev,
+            name: p.name || prev.name,
+            role: p.current_job_title || prev.role,
+            company: p.company || prev.company,
+            batch: p.passing_year ? `Class of '${String(p.passing_year).slice(-2)}` : prev.batch,
+            linkedin: p.linkedin_url || prev.linkedin
+          }));
+          setEditForm({
+            role: p.current_job_title || "",
+            company: p.company || "",
+            linkedin: p.linkedin_url || ""
+          });
+        }
+
+        const activeSlots = slotsData.status === "fulfilled" && Array.isArray(slotsData.value)
+          ? slotsData.value.filter(s => !s.is_booked).length
+          : 0;
+
+        const pendingReqs = requestsData.status === "fulfilled" && Array.isArray(requestsData.value)
+          ? requestsData.value.filter(r => r.status?.toLowerCase() === 'pending').length
+          : 0;
+
+        setDashboardStats({
+          activeSlotsCount: activeSlots,
+          pendingRequestsCount: pendingReqs
+        });
+
+      } catch (error) {
+        console.error("Dashboard data fetch failed:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, []);
+
   // Notifications State
   const [notifications, setNotifications] = useState([
-    { id: 1, text: "Siddiqur Rahman requested a mentorship slot.", time: "10 mins ago", unread: true },
-    { id: 2, text: "Your job posting for 'Frontend Developer' was approved.", time: "1 hour ago", unread: true },
-    { id: 3, text: "Session scheduled with Rahim Ahmed for tomorrow at 4 PM.", time: "1 day ago", unread: false }
+    { id: 1, text: "New mentorship slot requests are waiting for review.", time: "Recent", unread: true }
   ]);
 
   const unreadCount = notifications.filter(n => n.unread).length;
@@ -47,10 +102,28 @@ export default function AlumniDashboard({ user, onLogout }) {
     setNotifications(notifications.map(n => ({ ...n, unread: false })));
   };
 
-  const handleProfileSave = (e) => {
+  // Profile Save -> Call API Function
+  const handleProfileSave = async (e) => {
     e.preventDefault();
-    setUserProfile({ ...editForm });
-    setIsEditProfileOpen(false);
+    try {
+      await updateAlumniProfile({
+        current_job_title: editForm.role,
+        company: editForm.company,
+        linkedin_url: editForm.linkedin
+      });
+
+      setUserProfile(prev => ({
+        ...prev,
+        role: editForm.role,
+        company: editForm.company,
+        linkedin: editForm.linkedin
+      }));
+
+      setIsEditProfileOpen(false);
+      alert("Profile updated successfully!");
+    } catch (err) {
+      alert("Failed to update profile: " + err.message);
+    }
   };
 
   const handleLogoutClick = () => {
@@ -58,13 +131,13 @@ export default function AlumniDashboard({ user, onLogout }) {
       if (onLogout) {
         onLogout();
       } else {
+        localStorage.removeItem('token');
         localStorage.removeItem('campusconnect_user');
         window.location.href = '/';
       }
     }
   };
 
-  // নেভিগেশন আইটেমগুলোতে 'applications' ট্যাব যুক্ত করা হলো
   const navItems = [
     { id: 'overview', label: 'Home Overview', icon: Home },
     { id: 'slots', label: 'Slot Manager', icon: Calendar },
@@ -99,7 +172,6 @@ export default function AlumniDashboard({ user, onLogout }) {
               )}
             </button>
 
-            {/* Notification Dropdown */}
             {isNotificationsOpen && (
               <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-4 z-40 space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -149,7 +221,7 @@ export default function AlumniDashboard({ user, onLogout }) {
                 </button>
               </div>
               <span className="text-xs text-slate-500 mt-1">
-                {userProfile.role} • {userProfile.batch}
+                {userProfile.role} {userProfile.company ? `@ ${userProfile.company}` : ''} • {userProfile.batch}
               </span>
             </div>
           </div>
@@ -167,7 +239,6 @@ export default function AlumniDashboard({ user, onLogout }) {
 
       {/* Main Area */}
       <main className="max-w-7xl mx-auto px-8 py-6">
-        {/* Navigation Bar */}
         <div className="flex justify-between items-center mb-6">
           <nav className="flex space-x-2 bg-slate-100 p-1.5 rounded-2xl w-fit border border-slate-200/60">
             {navItems.map((item) => {
@@ -203,6 +274,7 @@ export default function AlumniDashboard({ user, onLogout }) {
         {activeTab === 'overview' && (
           <OverviewTab 
             userName={userProfile.name} 
+            stats={dashboardStats}
             setActiveTab={setActiveTab} 
             setIsModalOpen={setIsModalOpen} 
           />
@@ -227,33 +299,34 @@ export default function AlumniDashboard({ user, onLogout }) {
             </div>
             <form onSubmit={handleProfileSave} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Full Name</label>
-                <input 
-                  type="text" 
-                  value={editForm.name} 
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
-                  required 
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Current Role / Title</label>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Current Job Title</label>
                 <input 
                   type="text" 
                   value={editForm.role} 
                   onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  placeholder="e.g. Senior Software Engineer"
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
                   required 
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Graduation Batch</label>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Company</label>
                 <input 
                   type="text" 
-                  value={editForm.batch} 
-                  onChange={(e) => setEditForm({ ...editForm, batch: e.target.value })}
+                  value={editForm.company} 
+                  onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
+                  placeholder="e.g. Google, TechCorp"
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
-                  required 
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">LinkedIn URL</label>
+                <input 
+                  type="url" 
+                  value={editForm.linkedin} 
+                  onChange={(e) => setEditForm({ ...editForm, linkedin: e.target.value })}
+                  placeholder="https://linkedin.com/in/username"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
                 />
               </div>
               <div className="flex space-x-2 pt-3">
@@ -279,7 +352,7 @@ export default function AlumniDashboard({ user, onLogout }) {
   );
 }
 
-function OverviewTab({ userName, setActiveTab, setIsModalOpen }) {
+function OverviewTab({ userName, stats, setActiveTab, setIsModalOpen }) {
   return (
     <div className="main-content space-y-6">
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600 p-8 text-white shadow-xl shadow-indigo-100">
@@ -313,25 +386,29 @@ function OverviewTab({ userName, setActiveTab, setIsModalOpen }) {
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
           <div>
             <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">ACTIVE MENTORSHIP SLOTS</span>
-            <div className="mt-2 text-2xl font-black text-indigo-600">4 Slots</div>
+            <div className="mt-2 text-2xl font-black text-indigo-600">
+              {stats.activeSlotsCount} Slots
+            </div>
           </div>
-          <p className="mt-4 text-xs font-medium text-slate-500">Next availability: Tomorrow, 4:00 PM</p>
+          <p className="mt-4 text-xs font-medium text-slate-500">Available for juniors to book</p>
         </div>
 
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
           <div>
             <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">PENDING REQUESTS</span>
-            <div className="mt-2 text-2xl font-black text-amber-600">2 Requests</div>
+            <div className="mt-2 text-2xl font-black text-amber-600">
+              {stats.pendingRequestsCount} Requests
+            </div>
           </div>
           <p className="mt-4 text-xs font-medium text-slate-500">Needs review & approval</p>
         </div>
 
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
           <div>
-            <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">TOTAL JUNIORS MENTORED</span>
-            <div className="mt-2 text-2xl font-black text-emerald-600">28 Students</div>
+            <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">COMMUNITY IMPACT</span>
+            <div className="mt-2 text-2xl font-black text-emerald-600">Active Mentor</div>
           </div>
-          <p className="mt-4 text-xs font-medium text-slate-500">18 Hours total contributed</p>
+          <p className="mt-4 text-xs font-medium text-slate-500">Contributing to varsity juniors</p>
         </div>
       </div>
     </div>

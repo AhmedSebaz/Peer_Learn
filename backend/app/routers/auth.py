@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 import shutil
 import os
-
+from fastapi import Header
 from app.database import get_db
 from app.models import User, StudentProfile, AlumniProfile, Club, UserStatus, UserRole
 
@@ -264,3 +264,16 @@ def update_user_profile(
         "role": user_role_str,
         "profile_pic": final_pic
     }
+from app.models import UserRole
+
+# ৪. বর্তমান ইউজারকে ভেরিফাই করার ফাংশন (টেস্টিং বাইপাস)
+def get_current_user(db: Session = Depends(get_db)):
+    # ডাটাবেজ থেকে প্রথম যে অ্যাল্যামনাই (Alumni) ইউজার আছে, তাকেই রিটার্ন করবে
+    user = db.query(User).filter(User.role == UserRole.ALUMNI).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="ইউজার পাওয়া যায়নি! ডাটাবেজে অন্তত একজন Alumni একাউন্ট থাকতে হবে।"
+        )
+    return user
