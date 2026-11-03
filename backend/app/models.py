@@ -4,6 +4,10 @@ from sqlalchemy.sql import func
 from app.database import Base
 import enum
 
+# ==============================================================================
+# 1. ENUMS & CHOICES
+# ==============================================================================
+
 class UserRole(str, enum.Enum):
     STUDENT = "student"
     ADMIN = "admin"
@@ -72,6 +76,10 @@ class AttendanceStatus(str, enum.Enum):
     CHECKED_IN = "Checked In"
 
 
+# ==============================================================================
+# 2. CORE & AUTHENTICATION MODULE
+# ==============================================================================
+
 class User(Base):
     __tablename__ = "users"
 
@@ -102,6 +110,25 @@ class User(Base):
     received_mentorship_requests = relationship("AlumniMentorshipRequest", foreign_keys="[AlumniMentorshipRequest.alumni_id]", back_populates="alumni", cascade="all, delete")
 
 
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    amount = Column(DECIMAL(10, 2), nullable=False)
+    transaction_id = Column(String(100), unique=True, nullable=False)
+    payment_method = Column(String(50), nullable=False)
+    status = Column(Enum(PaymentStatus, values_callable=lambda x: [e.value for e in x]), default=PaymentStatus.PENDING)
+    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+
+    user = relationship("User", back_populates="payments")
+    event_registrations = relationship("EventRegistration", back_populates="payment")
+
+
+# ==============================================================================
+# 3. STUDENT MODULE
+# ==============================================================================
+
 class StudentProfile(Base):
     __tablename__ = "student_profiles"
 
@@ -118,60 +145,6 @@ class StudentProfile(Base):
     bio = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="student_profile")
-
-
-class Club(Base):
-    __tablename__ = "clubs"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    club_name = Column(String(100), nullable=False)
-    lead_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    description = Column(Text, nullable=True)
-    approval_document = Column(String(255), nullable=True)  # নতুন অ্যাট্রিবিউট যুক্ত করা হলো
-
-    lead_user = relationship("User", back_populates="clubs")
-    events = relationship("Event", back_populates="club", cascade="all, delete")
-
-
-class AlumniProfile(Base):
-    __tablename__ = "alumni_profiles"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    passing_year = Column(Integer, nullable=False)
-    current_job_title = Column(String(150), nullable=True)
-    company = Column(String(150), nullable=True)
-    linkedin_url = Column(String(255), nullable=True)
-    profile_pic = Column(String(255), nullable=True)
-    alumni_id_card = Column(String(255), nullable=True)
-
-    user = relationship("User", back_populates="alumni_profile")
-
-
-class AdminLog(Base):
-    __tablename__ = "admin_logs"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    action_performed = Column(Text, nullable=False)
-    timestamp = Column(TIMESTAMP, server_default=func.current_timestamp())
-
-    admin = relationship("User", back_populates="admin_logs")
-
-
-class Payment(Base):
-    __tablename__ = "payments"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    amount = Column(DECIMAL(10, 2), nullable=False)
-    transaction_id = Column(String(100), unique=True, nullable=False)
-    payment_method = Column(String(50), nullable=False)
-    status = Column(Enum(PaymentStatus, values_callable=lambda x: [e.value for e in x]), default=PaymentStatus.PENDING)
-    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
-
-    user = relationship("User", back_populates="payments")
-    event_registrations = relationship("EventRegistration", back_populates="payment")
 
 
 class Note(Base):
@@ -209,6 +182,104 @@ class NoteRating(Base):
 
     note = relationship("Note", back_populates="note_ratings")
     user = relationship("User", back_populates="ratings")
+
+
+# ==============================================================================
+# 4. ALUMNI MODULE
+# ==============================================================================
+
+class AlumniProfile(Base):
+    __tablename__ = "alumni_profiles"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    passing_year = Column(Integer, nullable=False)
+    current_job_title = Column(String(150), nullable=True)
+    company = Column(String(150), nullable=True)
+    linkedin_url = Column(String(255), nullable=True)
+    profile_pic = Column(String(255), nullable=True)
+    alumni_id_card = Column(String(255), nullable=True)
+
+    user = relationship("User", back_populates="alumni_profile")
+
+
+class MentorshipSlot(Base):
+    __tablename__ = "mentorship_slots"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    alumni_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    available_date = Column(Date, nullable=False)
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    is_booked = Column(Boolean, default=False, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+    
+    alumni = relationship("User", backref="available_slots")
+
+
+class AlumniMentorshipRequest(Base):
+    __tablename__ = "alumni_mentorship_requests"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    alumni_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    preferred_date = Column(Date, nullable=False)
+    message = Column(Text, nullable=True)
+    status = Column(Enum(MentorshipStatus, values_callable=lambda x: [e.value for e in x]), default=MentorshipStatus.PENDING, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+
+    student = relationship("User", foreign_keys=[student_id], back_populates="sent_mentorship_requests")
+    alumni = relationship("User", foreign_keys=[alumni_id], back_populates="received_mentorship_requests")
+
+
+class JobPost(Base):
+    __tablename__ = "job_posts"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    alumni_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    job_title = Column(String(150), nullable=False)
+    company_name = Column(String(150), nullable=False)
+    location = Column(String(100), nullable=False)
+    job_type = Column(Enum(JobType, values_callable=lambda x: [e.value for e in x]), default=JobType.FULL_TIME, nullable=False)
+    description = Column(Text, nullable=False)
+    application_link = Column(String(255), nullable=False)
+    status = Column(Enum(JobStatus, values_callable=lambda x: [e.value for e in x]), default=JobStatus.PENDING, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+
+    alumni = relationship("User", back_populates="job_posts")
+    applications = relationship("JobApplication", back_populates="job", cascade="all, delete")
+
+
+class JobApplication(Base):
+    __tablename__ = "job_applications"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    job_id = Column(Integer, ForeignKey("job_posts.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    resume_path = Column(String(255), nullable=False)
+    cover_letter = Column(Text, nullable=True)
+    status = Column(Enum(ApplicationStatus, values_callable=lambda x: [e.value for e in x]), default=ApplicationStatus.PENDING, nullable=False)
+    applied_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+
+    job = relationship("JobPost", back_populates="applications")
+    applicant = relationship("User", back_populates="job_applications")
+
+
+# ==============================================================================
+# 5. CLUB MODULE
+# ==============================================================================
+
+class Club(Base):
+    __tablename__ = "clubs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    club_name = Column(String(100), nullable=False)
+    lead_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    description = Column(Text, nullable=True)
+    approval_document = Column(String(255), nullable=True)  # নতুন অ্যাট্রিবিউট যুক্ত করা হলো
+
+    lead_user = relationship("User", back_populates="clubs")
+    events = relationship("Event", back_populates="club", cascade="all, delete")
 
 
 class Event(Base):
@@ -257,49 +328,16 @@ class EventRegistration(Base):
     payment = relationship("Payment", back_populates="event_registrations")
 
 
-class JobPost(Base):
-    __tablename__ = "job_posts"
+# ==============================================================================
+# 6. ADMIN MODULE
+# ==============================================================================
+
+class AdminLog(Base):
+    __tablename__ = "admin_logs"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    alumni_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    job_title = Column(String(150), nullable=False)
-    company_name = Column(String(150), nullable=False)
-    location = Column(String(100), nullable=False)
-    job_type = Column(Enum(JobType, values_callable=lambda x: [e.value for e in x]), default=JobType.FULL_TIME, nullable=False)
-    description = Column(Text, nullable=False)
-    application_link = Column(String(255), nullable=False)
-    status = Column(Enum(JobStatus, values_callable=lambda x: [e.value for e in x]), default=JobStatus.PENDING, nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+    admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    action_performed = Column(Text, nullable=False)
+    timestamp = Column(TIMESTAMP, server_default=func.current_timestamp())
 
-    alumni = relationship("User", back_populates="job_posts")
-    applications = relationship("JobApplication", back_populates="job", cascade="all, delete")
-
-
-class JobApplication(Base):
-    __tablename__ = "job_applications"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    job_id = Column(Integer, ForeignKey("job_posts.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    resume_path = Column(String(255), nullable=False)
-    cover_letter = Column(Text, nullable=True)
-    status = Column(Enum(ApplicationStatus, values_callable=lambda x: [e.value for e in x]), default=ApplicationStatus.PENDING, nullable=False)
-    applied_at = Column(TIMESTAMP, server_default=func.current_timestamp())
-
-    job = relationship("JobPost", back_populates="applications")
-    applicant = relationship("User", back_populates="job_applications")
-
-
-class AlumniMentorshipRequest(Base):
-    __tablename__ = "alumni_mentorship_requests"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    alumni_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    preferred_date = Column(Date, nullable=False)
-    message = Column(Text, nullable=True)
-    status = Column(Enum(MentorshipStatus, values_callable=lambda x: [e.value for e in x]), default=MentorshipStatus.PENDING, nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
-
-    student = relationship("User", foreign_keys=[student_id], back_populates="sent_mentorship_requests")
-    alumni = relationship("User", foreign_keys=[alumni_id], back_populates="received_mentorship_requests")
+    admin = relationship("User", back_populates="admin_logs")

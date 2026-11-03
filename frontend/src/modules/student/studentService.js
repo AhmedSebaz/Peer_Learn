@@ -158,17 +158,19 @@ export const getMentors = async () => {
   }
 };
 
-export const bookMentorshipSlot = async (mentorId, userId, slot) => {
+export const bookMentorshipSlot = async (alumniId, preferredDate, message = "") => {
   try {
     const response = await fetch(`${API_BASE_URL}/student/mentors/book`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        // "Authorization": `Bearer ${localStorage.getItem("token")}` // টোকেন থাকলে আনকমেন্ট করুন
       },
+      // ব্যাকএন্ড স্কিমার সাথে হুবহু মিল রেখে (Snake Case) ডেটা পাঠানো হলো
       body: JSON.stringify({
-        mentor_id: mentorId,
-        user_id: userId,
-        slot_time: slot
+        alumni_id: alumniId,
+        preferred_date: preferredDate,
+        message: message
       }),
     });
 
@@ -176,7 +178,7 @@ export const bookMentorshipSlot = async (mentorId, userId, slot) => {
       const result = await response.json();
       return { success: true, data: result };
     } else {
-      const errData = await response.json();
+      const errData = await response.json().catch(() => ({}));
       return { success: false, message: errData.detail || "Booking failed" };
     }
   } catch (error) {
