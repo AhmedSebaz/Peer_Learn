@@ -1,71 +1,131 @@
-// Mock service file handling API interactions for the Alumni module
+// alumniService.js - Real API integration for Alumni Module
 
-export const fetchAlumniProfile = async () => {
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
+// Helper function to handle authenticated headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("token");
   return {
-    name: "Alex Morgan",
-    title: "Senior Software Engineer",
-    company: "Tech Corp",
-    graduationYear: "2021",
-    department: "Computer Science & Engineering",
-    avatar: "A"
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 };
 
+// Generic response handler
+const handleResponse = async (response) => {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Request failed with status ${response.status}`);
+  }
+  return response.json();
+};
+
+// ==========================================
+// 1. ALUMNI PROFILE APIS
+// ==========================================
+
+// Fetch authenticated alumni profile details
+export const fetchAlumniProfile = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/alumni/profile`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+};
+
+// Update alumni profile (current_job_title, company, linkedin_url)
+export const updateAlumniProfile = async (profileData) => {
+  const response = await fetch(`${API_BASE_URL}/api/alumni/profile`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(profileData),
+  });
+  return handleResponse(response);
+};
+
+// ==========================================
+// 2. MENTORSHIP SLOTS APIS
+// ==========================================
+
+// Fetch slots created by the alumni
 export const fetchSlots = async () => {
-  return [
-    { id: 1, date: "2026-08-25", time: "10:00 AM - 10:30 AM", topic: "Career Guidance & Resume Review", isBooked: false },
-    { id: 2, date: "2026-08-26", time: "04:00 PM - 04:30 PM", topic: "System Design Mock Interview", isBooked: true, bookedBy: "Rahim Ahmed" }
-  ];
+  const response = await fetch(`${API_BASE_URL}/api/alumni/slots`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
 };
 
-export const fetchMentorshipRequests = async () => {
-  return [
-    { id: 101, studentName: "Siddiqur Rahman", semester: "Semester 3.2", topic: "Frontend Development Roadmaps", message: "Hi! I want to learn more about transitioning into React and Tailwind.", date: "Aug 24, 2026", status: "pending" },
-    { id: 102, studentName: "Anika Chowdhury", semester: "Semester 4.1", topic: "Job Referral & Portfolio Review", message: "Looking for feedback on my full-stack project portfolio.", date: "Aug 26, 2026", status: "pending" }
-  ];
-};
-
-export const fetchJobApplications = async () => {
-  return [
-    {
-      id: 1,
-      jobTitle: "Frontend Developer",
-      company: "Tech Solutions Ltd.",
-      applicantName: "MD Istiack Ahmed",
-      studentId: "24524203102",
-      department: "CSE, BUP",
-      coverLetter: "I have strong experience in React, Tailwind CSS, and FastAPI integrations. Eager to contribute to your team!",
-      resumePath: "#",
-      status: "Pending",
-      appliedAt: "2026-09-05"
-    },
-    {
-      id: 2,
-      jobTitle: "Software Engineer Intern",
-      company: "Innovate BD",
-      applicantName: "Rahim Ahmed",
-      studentId: "24524203105",
-      department: "ICT, BUP",
-      coverLetter: "Passionate about algorithms and backend development. Solved 500+ problems on Codeforces.",
-      resumePath: "#",
-      status: "Shortlisted",
-      appliedAt: "2026-09-04"
-    }
-  ];
-};
-
+// Create a new mentorship slot (available_date, start_time, end_time)
 export const createSlot = async (slotData) => {
-  return { id: Date.now(), ...slotData, isBooked: false };
+  const response = await fetch(`${API_BASE_URL}/api/alumni/slots`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(slotData),
+  });
+  return handleResponse(response);
 };
 
+// ==========================================
+// 3. MENTORSHIP REQUESTS APIS
+// ==========================================
+
+// Fetch mentorship requests sent by students to this alumni
+export const fetchMentorshipRequests = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/alumni/mentorship-requests`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+};
+
+// Respond to mentorship request ("accepted" or "rejected")
 export const updateRequestStatus = async (requestId, status) => {
-  return { requestId, status, success: true };
+  const response = await fetch(`${API_BASE_URL}/api/alumni/mentorship-requests/${requestId}`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  return handleResponse(response);
 };
 
-export const updateApplicationStatus = async (appId, status) => {
-  return { appId, status, success: true };
-};
+// ==========================================
+// 4. JOB POSTING & APPLICATIONS APIS
+// ==========================================
 
+// Submit a new job or internship post
 export const submitJobPosting = async (jobData) => {
-  return { id: Date.now(), ...jobData, datePosted: new Date().toLocaleDateString() };
+  const response = await fetch(`${API_BASE_URL}/api/alumni/jobs`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(jobData),
+  });
+  return handleResponse(response);
+};
+
+// Fetch job applications for a specific job post
+export const fetchJobApplications = async (jobId) => {
+  const response = await fetch(`${API_BASE_URL}/api/alumni/jobs/${jobId}/applications`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+  });
+  const applications = await handleResponse(response);
+
+  // Resume path formatting for direct preview/download
+  return applications.map((app) => ({
+    ...app,
+    resumeDownloadUrl: app.resume_path
+      ? (app.resume_path.startsWith("http") ? app.resume_path : `${API_BASE_URL}/${app.resume_path}`)
+      : "#",
+  }));
+};
+
+// Update student job application status ("shortlisted" or "rejected")
+export const updateApplicationStatus = async (appId, status) => {
+  const response = await fetch(`${API_BASE_URL}/api/alumni/applications/${appId}/status`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  return handleResponse(response);
 };

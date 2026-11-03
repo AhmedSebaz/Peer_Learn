@@ -52,7 +52,10 @@ const CareerPortal = ({ user }) => {
         ...prev,
         [selectedJobForApply.id]: true
       }));
-      alert(`Successfully applied for "${selectedJobForApply.title}" at ${selectedJobForApply.company}!`);
+      // Updated to safely access job title and company
+      const jobTitle = selectedJobForApply.title || selectedJobForApply.job_title || "the job";
+      const companyName = selectedJobForApply.company || selectedJobForApply.company_name || "";
+      alert(`Successfully applied for "${jobTitle}" at ${companyName}!`);
       setSelectedJobForApply(null);
     } else {
       alert(response?.message || "Job application failed. Please try again.");
@@ -60,13 +63,21 @@ const CareerPortal = ({ user }) => {
   };
 
   const filteredJobs = jobs.filter((job) => {
+    // Safely get properties, falling back to empty string if missing
+    // Support both frontend camelCase and backend snake_case property names
+    const title = (job.title || job.job_title || '').toLowerCase();
+    const company = (job.company || job.company_name || '').toLowerCase();
+    const location = (job.location || '').toLowerCase();
+    const type = (job.type || job.job_type || '').toLowerCase();
+    const searchLower = (searchTerm || '').toLowerCase();
+
     const matchesSearch =
-      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.location.toLowerCase().includes(searchTerm.toLowerCase());
+      title.includes(searchLower) ||
+      company.includes(searchLower) ||
+      location.includes(searchLower);
 
     const matchesType =
-      selectedType === 'All' || job.type.toLowerCase() === selectedType.toLowerCase();
+      selectedType === 'All' || type === (selectedType || '').toLowerCase();
 
     return matchesSearch && matchesType;
   });

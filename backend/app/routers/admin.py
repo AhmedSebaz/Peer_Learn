@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from app.database import get_db
-from app.models import User, StudentProfile, AlumniProfile, Club, Note, JobPost, UserStatus, UserRole
+from app.models import JobStatus, User, StudentProfile, AlumniProfile, Club, Note, JobPost, UserStatus, UserRole
 
 router = APIRouter(
     prefix="/admin",
@@ -212,8 +212,18 @@ def update_job_status(job_id: int, payload: StatusUpdateRequest, db: Session = D
         if not job:
             raise HTTPException(status_code=404, detail="জব পোস্টটি পাওয়া যায়নি!")
 
-        job.status = payload.status.lower() # 'active', 'rejected', 'pending'
+        # ফ্রন্টএন্ড থেকে আসা স্ট্যাটাসটি নিন
+        req_status = payload.status.lower()
+        
+        # যদি ফ্রন্টএন্ড 'active' পাঠায়, তবে ডাটাবেজের জন্য সেটিকে 'approved' এ রূপান্তর করুন
+        if req_status == "active":
+            req_status = "approved"
+
+        # সঠিক Enum ভ্যালু দিয়ে স্ট্যাটাস আপডেট করুন
+        job.status = JobStatus(req_status) 
         db.commit()
         return {"message": "জব পোস্টের স্ট্যাটাস সফলভাবে আপডেট করা হয়েছে!"}
+    
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        db.rollback() # ডাটাবেজ এরর হলে যেন হ্যাং না করে তাই রোলব্যাক
+        raise HTTPException(status_code=500, detail=f"আপডেট ব্যর্থ হয়েছে: {str(e)}")

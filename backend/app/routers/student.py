@@ -362,7 +362,6 @@ def get_upcoming_events(
     return upcoming_events
 
 
-# ৮. মেন্টরশিপের জন্য অ্যালুনিদের তালিকা দেখা
 @router.get("/mentors")
 def get_all_mentors(db: Session = Depends(get_db)):
     alumni_users = db.query(User).filter(User.role == UserRole.ALUMNI, User.status == UserStatus.ACTIVE).all()
@@ -382,7 +381,6 @@ def get_all_mentors(db: Session = Depends(get_db)):
     return mentors_list
 
 
-# ৯. অ্যালুনির মেন্টরশিপ স্লট বুক বা রিকোয়েস্ট পাঠানোর এন্ডপয়েন্ট
 @router.post("/mentors/book", response_model=MentorshipRequestResponse)
 def book_mentorship_slot(
     request_data: MentorshipRequestCreate,
