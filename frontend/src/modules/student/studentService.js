@@ -243,7 +243,6 @@ export const processEventPayment = async (eventId, userId, registrationType = "F
 
 
 // --- CAREER JOBS SERVICES ---
-
 export const getCareerJobs = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/student/jobs`);
@@ -256,12 +255,33 @@ export const getCareerJobs = async () => {
         location: job.location,
         type: job.job_type,
         deadline: job.deadline || 'N/A',
-        description: job.description
+        description: job.description,
+        postedBy: job.posted_by || 'Alumni Partner',
+        alumniDescription: job.alumni_description || 'Alumni & Tech Professional'
       }));
     }
     return [];
   } catch (error) {
     console.error("Error fetching jobs:", error);
+    return [];
+  }
+};
+
+export const fetchStudentApplications = async (userId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/student/my-applications?user_id=${userId}`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.map(app => ({
+        id: app.id,
+        jobId: app.job_id,
+        status: app.status || 'pending',
+        appliedDate: app.created_at ? new Date(app.created_at).toLocaleDateString() : 'Recent'
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching applications:", error);
     return [];
   }
 };

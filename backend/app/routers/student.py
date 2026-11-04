@@ -235,7 +235,6 @@ def register_for_event(
         if not registration.transaction_id or not registration.payment_method:
             raise HTTPException(status_code=400, detail="Transaction ID and Payment Method are required for paid events")
         
-        # পেমেন্ট সফল হওয়ার সাথে সাথেই স্ট্যাটাস APPROVED করা হলো
         new_payment = Payment(
             user_id=user_id,
             amount=event.registration_fee,
@@ -401,3 +400,17 @@ def book_mentorship_slot(
     db.commit()
     db.refresh(new_request)
     return new_request
+
+
+@router.get("/my-applications")
+def get_my_applications(user_id: int, db: Session = Depends(get_db)):
+    applications = db.query(JobApplication).filter(JobApplication.user_id == user_id).all()
+    result = []
+    for app in applications:
+        result.append({
+            "id": app.id,
+            "job_id": app.job_id,
+            "status": app.status.value if hasattr(app.status, 'value') else app.status,
+            "created_at": app.applied_at
+        })
+    return result

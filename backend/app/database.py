@@ -7,7 +7,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # MySQL কানেকশন স্ট্রিং
-DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:Istiack123%40@localhost:3306/campusconnect")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "mysql+pymysql://root:JavaProject%401@localhost:3306/campusconnect"
+)
 
 # MySQL ইঞ্জিন তৈরি করা (pool_pre_ping=True যুক্ত করা হয়েছে)
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)

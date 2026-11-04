@@ -1,36 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, MapPin, Building, Calendar, Search, CheckCircle, ExternalLink, X, FileText, Upload } from 'lucide-react';
-import { getCareerJobs, applyForJob } from './studentService';
+import { Briefcase, MapPin, Building, Calendar, Search, CheckCircle, ExternalLink, X, FileText, Upload, Clock, AlertCircle, Info } from 'lucide-react';
+import { getCareerJobs, applyForJob, fetchStudentApplications } from './studentService';
 
 const CareerPortal = ({ user }) => {
   const [jobs, setJobs] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('All');
-  const [appliedJobs, setAppliedJobs] = useState({});
+  const [appliedJobsMap, setAppliedJobsMap] = useState({});
 
-  // Application Modal States
   const [selectedJobForApply, setSelectedJobForApply] = useState(null);
   const [coverLetter, setCoverLetter] = useState('');
   const [resumeFile, setResumeFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadJobs();
-  }, []);
+  const [selectedJobDetails, setSelectedJobDetails] = useState(null);
 
-  const loadJobs = async () => {
-    const data = await getCareerJobs();
-    setJobs(data || []);
+  useEffect(() => {
+    loadData();
+  }, [user]);
+
+  const loadData = async () => {
+    const userId = user?.id || user?.user_id || 1;
+    const [jobsData, appsData] = await Promise.all([
+      getCareerJobs(),
+      fetchStudentApplications(userId)
+    ]);
+
+    setJobs(jobsData || []);
+    const appsMap = {};
+    if (Array.isArray(appsData)) {
+      appsData.forEach(app => {
+        appsMap[app.jobId] = app.status;
+      });
+    }
+    setAppliedJobsMap(appsMap);
   };
 
-  // Trigger when clicking Apply Now
   const handleOpenApplyModal = (job) => {
     setSelectedJobForApply(job);
     setCoverLetter('');
     setResumeFile(null);
   };
 
-  // Submit application form to Backend
   const handleConfirmApplication = async (e) => {
     e.preventDefault();
     if (!selectedJobForApply) return;
@@ -48,56 +59,40 @@ const CareerPortal = ({ user }) => {
     setIsSubmitting(false);
 
     if (response && response.success) {
-      setAppliedJobs((prev) => ({
+      setAppliedJobsMap((prev) => ({
         ...prev,
-        [selectedJobForApply.id]: true
+        [selectedJobForApply.id]: 'pending'
       }));
-      // Updated to safely access job title and company
-      const jobTitle = selectedJobForApply.title || selectedJobForApply.job_title || "the job";
-      const companyName = selectedJobForApply.company || selectedJobForApply.company_name || "";
-      alert(`Successfully applied for "${jobTitle}" at ${companyName}!`);
+      alert(`Successfully applied for "${selectedJobForApply.title}"!`);
       setSelectedJobForApply(null);
+      setSelectedJobDetails(null);
     } else {
-      alert(response?.message || "Job application failed. Please try again.");
+      alert(response?.message || "Job application failed.");
     }
   };
 
   const filteredJobs = jobs.filter((job) => {
-    // Safely get properties, falling back to empty string if missing
-    // Support both frontend camelCase and backend snake_case property names
     const title = (job.title || job.job_title || '').toLowerCase();
     const company = (job.company || job.company_name || '').toLowerCase();
     const location = (job.location || '').toLowerCase();
     const type = (job.type || job.job_type || '').toLowerCase();
     const searchLower = (searchTerm || '').toLowerCase();
 
-    const matchesSearch =
-      title.includes(searchLower) ||
-      company.includes(searchLower) ||
-      location.includes(searchLower);
-
-    const matchesType =
-      selectedType === 'All' || type === (selectedType || '').toLowerCase();
-
+    const matchesSearch = title.includes(searchLower) || company.includes(searchLower) || location.includes(searchLower);
+    const matchesType = selectedType === 'All' || type === (selectedType || '').toLowerCase();
     return matchesSearch && matchesType;
   });
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
-            <Briefcase className="w-6 h-6 text-indigo-600" />
-            <span>Career Opportunities & Internships</span>
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Explore exclusive internships and job circulars referred directly by alumni and partner tech companies.
-          </p>
-        </div>
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+        <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
+          <Briefcase className="w-6 h-6 text-indigo-600" />
+          <span>Career Opportunities & Internships</span>
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">Explore exclusive internships and job circulars referred directly by alumni.</p>
       </div>
 
-      {/* Search & Filter */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
@@ -106,21 +101,16 @@ const CareerPortal = ({ user }) => {
             placeholder="Search title, company, or city..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none"
           />
         </div>
 
-        {/* Type Filters */}
-        <div className="flex space-x-2 overflow-x-auto w-full sm:w-auto pb-1">
+        <div className="flex space-x-2">
           {['All', 'Internship', 'Full-time', 'Part-time'].map((type) => (
             <button
               key={type}
               onClick={() => setSelectedType(type)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                selectedType === type
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-              }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${selectedType === type ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border'}`}
             >
               {type}
             </button>
@@ -128,138 +118,134 @@ const CareerPortal = ({ user }) => {
         </div>
       </div>
 
-      {/* Jobs List */}
       <div className="space-y-4">
-        {filteredJobs.length > 0 ? (
-          filteredJobs.map((job) => {
-            const isApplied = appliedJobs[job.id];
-            return (
-              <div
-                key={job.id}
-                className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:shadow-md transition-shadow"
-              >
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-lg">
-                      {job.type}
-                    </span>
-                    <span className="text-xs text-gray-400 flex items-center space-x-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>Deadline: {job.deadline}</span>
-                    </span>
-                  </div>
-
-                  <h3 className="font-bold text-gray-900 text-lg">{job.title}</h3>
-
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600">
-                    <span className="flex items-center space-x-1 font-medium">
-                      <Building className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{job.company}</span>
-                    </span>
-                    <span className="flex items-center space-x-1">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{job.location}</span>
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-gray-500 pt-1 line-clamp-2">{job.description}</p>
-                </div>
-
-                <div className="w-full md:w-auto flex-shrink-0">
-                  <button
-                    disabled={isApplied}
-                    onClick={() => handleOpenApplyModal(job)}
-                    className={`w-full md:w-auto px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center space-x-2 ${
-                      isApplied
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed'
-                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-100'
-                    }`}
-                  >
-                    {isApplied ? (
-                      <>
-                        <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>Application Sent</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Apply Now</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </>
-                    )}
-                  </button>
-                </div>
+        {filteredJobs.map((job) => {
+          const status = appliedJobsMap[job.id];
+          return (
+            <div key={job.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex justify-between items-center">
+              <div className="space-y-2">
+                <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-lg">{job.type}</span>
+                <h3 className="font-bold text-gray-900 text-lg">{job.title}</h3>
+                <p className="text-xs text-gray-600">{job.company} • {job.location}</p>
               </div>
-            );
-          })
-        ) : (
-          <div className="py-12 text-center bg-white rounded-2xl border border-gray-200">
-            <p className="text-sm text-gray-500">কোনো জব অপরচুনিটি পাওয়া যায়নি।</p>
-          </div>
-        )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedJobDetails(job)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold flex items-center space-x-1"
+                >
+                  <Info className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Job Details</span>
+                </button>
+
+                {status ? (
+                  <span className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase ${status === 'accepted' ? 'bg-emerald-50 text-emerald-700' : status === 'rejected' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>
+                    {status}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handleOpenApplyModal(job)}
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold"
+                  >
+                    Apply Now
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Job Application Modal */}
-      {selectedJobForApply && (
+     {/* Job Details Modal */}
+      {selectedJobDetails && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 relative shadow-2xl space-y-6">
             <button 
-              onClick={() => setSelectedJobForApply(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              onClick={() => setSelectedJobDetails(null)} 
+              className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center space-x-2 text-indigo-600 font-bold mb-1">
-              <FileText className="w-5 h-5" />
-              <span>Job Application</span>
+            {/* Modal Header */}
+            <div>
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-lg uppercase">
+                  {selectedJobDetails.type || 'Full Time'}
+                </span>
+                <span className="text-xs text-gray-400">
+                  Deadline: {selectedJobDetails.deadline || 'N/A'}
+                </span>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900">{selectedJobDetails.title}</h3>
+              <p className="text-sm font-semibold text-indigo-600 mt-1 flex items-center space-x-1">
+                <span>{selectedJobDetails.company}</span>
+                <span>•</span>
+                <span className="text-gray-500 font-normal">{selectedJobDetails.location}</span>
+              </p>
             </div>
-            
-            <h3 className="text-lg font-bold text-gray-900">{selectedJobForApply.title}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Company: <span className="text-gray-800 font-semibold">{selectedJobForApply.company}</span>
-            </p>
 
-            <form onSubmit={handleConfirmApplication} className="mt-5 space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-gray-700 block mb-1">Cover Letter / Note to Recruiter</label>
-                <textarea
-                  rows="4"
-                  placeholder="Briefly describe why you are a good fit for this role..."
-                  value={coverLetter}
-                  onChange={(e) => setCoverLetter(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-                />
+            {/* Alumni Poster Information Box */}
+            <div className="bg-gradient-to-r from-indigo-50/60 to-purple-50/60 p-4 rounded-2xl border border-indigo-100 flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center shadow-md">
+                {(selectedJobDetails.postedBy || 'Alumni').charAt(0)}
               </div>
-
               <div>
-                <label className="text-xs font-semibold text-gray-700 block mb-1">Upload Resume (PDF)</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:bg-gray-50 transition-colors cursor-pointer relative">
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => setResumeFile(e.target.files[0])}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  <div className="flex flex-col items-center space-y-1">
-                    <Upload className="w-6 h-6 text-indigo-600" />
-                    <p className="text-xs text-gray-600 font-medium">
-                      {resumeFile ? resumeFile.name : "Click to upload resume or drag and drop"}
-                    </p>
-                    <p className="text-[10px] text-gray-400">PDF, DOC up to 5MB</p>
-                  </div>
-                </div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Posted By Alumni</p>
+                <p className="text-sm font-bold text-gray-900">{selectedJobDetails.postedBy || 'Alumni Partner'}</p>
+                <p className="text-xs text-gray-600">{selectedJobDetails.alumniDescription || 'Alumni & Tech Professional'}</p>
               </div>
+            </div>
 
+            {/* Job Description & Requirements */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Job Description & Requirements</h4>
+              <div className="bg-gray-50 p-4 rounded-2xl text-sm text-gray-700 leading-relaxed max-h-48 overflow-y-auto border border-gray-100">
+                {selectedJobDetails.description || 'No description provided.'}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-3 pt-2">
               <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl text-sm transition-colors mt-2 shadow-lg shadow-indigo-100 flex items-center justify-center space-x-2"
+                onClick={() => setSelectedJobDetails(null)}
+                className="w-1/2 py-2.5 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200"
               >
-                {isSubmitting ? (
-                  <span>Submitting Application...</span>
-                ) : (
-                  <span>Submit Application</span>
-                )}
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  const job = selectedJobDetails;
+                  setSelectedJobDetails(null);
+                  handleOpenApplyModal(job);
+                }}
+                className="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors shadow-md shadow-indigo-100 flex items-center justify-center space-x-2"
+              >
+                <span>Apply For Job</span>
+                <ExternalLink className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Apply Modal */}
+      {selectedJobForApply && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 relative">
+            <button onClick={() => setSelectedJobForApply(null)} className="absolute top-4 right-4 text-gray-400"><X className="w-5 h-5" /></button>
+            <h3 className="text-lg font-bold">Apply for {selectedJobForApply.title}</h3>
+            <form onSubmit={handleConfirmApplication} className="mt-4 space-y-4">
+              <textarea
+                rows="3"
+                placeholder="Cover letter..."
+                value={coverLetter}
+                onChange={(e) => setCoverLetter(e.target.value)}
+                className="w-full px-4 py-2 border rounded-xl text-sm"
+              />
+              <input type="file" onChange={(e) => setResumeFile(e.target.files[0])} className="w-full text-xs" />
+              <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl text-sm font-semibold">
+                {isSubmitting ? 'Submitting...' : 'Submit Application'}
               </button>
             </form>
           </div>

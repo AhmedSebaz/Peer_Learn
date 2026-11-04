@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Calendar, Users, Briefcase, Bell, PlusCircle, LogOut, Edit3, X,FileText} 
-from 'lucide-react';
+import { Home, Calendar, Users, Briefcase, Bell, PlusCircle, LogOut, Edit3, X, FileText, UserCheck } from 'lucide-react';
 import SlotManager from './SlotManager';
 import MentorshipRequests from './MentorshipRequests';
 import PostJobModal from './PostJobModal';
 import ViewApplications from './ViewApplications';
+import MyJobs from './MyJobs';
 
 // Alumni API Services Import
 import { 
@@ -39,12 +39,18 @@ export default function AlumniDashboard({ user, onLogout }) {
     pendingRequestsCount: 0
   });
 
+  const [selectedJobIdForApps, setSelectedJobIdForApps] = useState(null);
+
+  const handleViewApplicantsForJob = (jobId) => {
+    setSelectedJobIdForApps(jobId);
+    setActiveTab('job-applicants');
+  };
+
   // Initial Backend Data Fetch
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
-        // প্রোফাইল, স্লট এবং মেন্টরশিপ রিকোয়েস্ট ফেচ করা
         const [profileData, slotsData, requestsData] = await Promise.allSettled([
           fetchAlumniProfile(),
           fetchSlots(),
@@ -140,9 +146,10 @@ export default function AlumniDashboard({ user, onLogout }) {
 
   const navItems = [
     { id: 'overview', label: 'Home Overview', icon: Home },
+    { id: 'my-jobs', label: 'My Posted Jobs', icon: Briefcase },
     { id: 'slots', label: 'Slot Manager', icon: Calendar },
     { id: 'requests', label: 'Mentorship Requests', icon: Users },
-    { id: 'applications', label: 'View Applications', icon: FileText },
+    { id: 'shortlisted', label: 'Shortlisted Candidates', icon: UserCheck },
   ];
 
   return (
@@ -243,7 +250,7 @@ export default function AlumniDashboard({ user, onLogout }) {
           <nav className="flex space-x-2 bg-slate-100 p-1.5 rounded-2xl w-fit border border-slate-200/60">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = activeTab === item.id;
+              const isActive = activeTab === item.id || (activeTab === 'job-applicants' && item.id === 'my-jobs');
               return (
                 <button
                   key={item.id}
@@ -279,9 +286,11 @@ export default function AlumniDashboard({ user, onLogout }) {
             setIsModalOpen={setIsModalOpen} 
           />
         )}
+        {activeTab === 'my-jobs' && <MyJobs onViewApplicants={handleViewApplicantsForJob} />}
+        {activeTab === 'job-applicants' && <ViewApplications activeJobId={selectedJobIdForApps} />}
         {activeTab === 'slots' && <SlotManager />}
         {activeTab === 'requests' && <MentorshipRequests />}
-        {activeTab === 'applications' && <ViewApplications />}
+        {activeTab === 'shortlisted' && <ViewApplications filterStatus="shortlisted" />}
       </main>
 
       {/* Job Post Modal */}

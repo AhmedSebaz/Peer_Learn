@@ -129,3 +129,11 @@ export const updateApplicationStatus = async (appId, status) => {
   });
   return handleResponse(response);
 };
+
+export const deleteJobPosting = async (jobId) => {
+  const response = await fetch(`${API_BASE_URL}/api/alumni/jobs/${jobId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+};

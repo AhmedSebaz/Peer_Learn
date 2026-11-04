@@ -200,6 +200,25 @@ def get_job_posts(
     jobs = db.query(JobPost).filter(JobPost.alumni_user_id == current_user.id).all()
     return jobs
 
+    # Job post delete korar route
+@router.delete("/jobs/{job_id}", response_model=dict)
+def delete_job_post(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    job = db.query(JobPost).filter(
+        JobPost.id == job_id,
+        JobPost.alumni_user_id == current_user.id
+    ).first()
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job post khuje paoya jayni!")
+
+    db.delete(job)
+    db.commit()
+    return {"message": "Job post successfully deleted!"}
+
 # ==========================================
 # 5. JOB APPLICATIONS (View & Update Status)
 # ==========================================
